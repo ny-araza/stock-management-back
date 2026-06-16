@@ -55,6 +55,11 @@ MIDDLEWARE = [
 ]
 
 
+AUTHENTICATION_BACKENDS = [
+    'polls.backends.TUserBackend',
+    'django.contrib.auth.backends.ModelBackend'
+]
+
 ROOT_URLCONF = 'server.urls'
 
 TEMPLATES = [
