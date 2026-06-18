@@ -144,23 +144,40 @@ class TAcces(models.Model):
 
 
 class TArticle(models.Model):
-    art_id = models.AutoField(db_column='art_Id', primary_key=True)  # Field name made lowercase.
-    art_code = models.CharField(db_column='art_Code', max_length=25)  # Field name made lowercase.
-    art_nom = models.CharField(db_column='art_Nom', max_length=155, blank=True, null=True)  # Field name made lowercase.
-    art_datecre = models.DateTimeField(db_column='art_DateCre', blank=True, null=True)  # Field name made lowercase.
-    art_datemdf = models.DateTimeField(db_column='art_DateMdf', blank=True, null=True)  # Field name made lowercase.
-    art_usercre = models.CharField(db_column='art_UserCre', max_length=25, blank=True, null=True)  # Field name made lowercase.
-    art_usermdf = models.CharField(db_column='art_UserMdf', max_length=25, blank=True, null=True)  # Field name made lowercase.
-    art_poids = models.DecimalField(db_column='art_Poids', max_digits=18, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
-    art_taille = models.DecimalField(db_column='art_Taille', max_digits=10, decimal_places=0, blank=True, null=True)  # Field name made lowercase.
-    art_stockmini = models.IntegerField(db_column='art_StockMini', blank=True, null=True)  # Field name made lowercase.
-    art_enabled = models.IntegerField(blank=True, null=True)
-    art_fam_id = models.IntegerField(db_column='art_fam_Id', blank=True, null=True)  # Field name made lowercase.
-    art_sof_id = models.IntegerField(db_column='art_sof_Id', blank=True, null=True)  # Field name made lowercase.
-    art_codebarre = models.CharField(db_column='art_CodeBarre', max_length=100, blank=True, null=True)  # Field name made lowercase.
-    art_lot_id = models.IntegerField(db_column='art_lot_Id', blank=True, null=True)  # Field name made lowercase.
-    art_stockable = models.IntegerField(db_column='art_Stockable', blank=True, null=True)  # Field name made lowercase.
-    art_marque = models.CharField(db_column='art_Marque', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    art_id = models.AutoField(db_column='art_Id', primary_key=True)
+    art_code = models.CharField(db_column='art_Code', max_length=25)
+    art_nom = models.CharField(
+            db_column='art_Nom', max_length=155, blank=True, null=True)
+    art_datecre = models.DateTimeField(
+            db_column='art_DateCre', blank=True, null=True)
+    art_datemdf = models.DateTimeField(
+            db_column='art_DateMdf', blank=True, null=True)
+    art_usercre = models.CharField(
+            db_column='art_UserCre', max_length=25, blank=True, null=True)
+    art_usermdf = models.CharField(
+            db_column='art_UserMdf', max_length=25, blank=True, null=True)
+    art_poids = models.DecimalField(
+            db_column='art_Poids', max_digits=18,
+            decimal_places=2, blank=True, null=True)
+    art_taille = models.DecimalField(
+            db_column='art_Taille', max_digits=10,
+            decimal_places=0, blank=True, null=True)
+    art_stockmini = models.IntegerField(
+            db_column='art_StockMini', blank=True, null=True)
+    art_enabled = models.IntegerField(
+            blank=True, null=True)
+    art_fam_id = models.IntegerField(
+            db_column='art_fam_Id', blank=True, null=True)
+    art_sof_id = models.IntegerField(
+            db_column='art_sof_Id', blank=True, null=True)
+    art_codebarre = models.CharField(
+            db_column='art_CodeBarre', max_length=100, blank=True, null=True)
+    art_lot_id = models.IntegerField(
+            db_column='art_lot_Id', blank=True, null=True)
+    art_stockable = models.IntegerField(
+            db_column='art_Stockable', blank=True, null=True)
+    art_marque = models.CharField(
+            db_column='art_Marque', max_length=50, blank=True, null=True)
 
     class Meta:
         managed = False

@@ -1,4 +1,4 @@
-from .models import TUsers
+from .models import TUsers, TArticle
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 
@@ -27,3 +27,10 @@ class LoginSerializer(serializers.Serializer):
 
         data["user"] = user
         return data
+
+
+# Articles
+class ArticlesSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = TArticle
+        fields = "__all__"

@@ -4,8 +4,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework import status
-from .models import TUsers
-from .serializers import TUsersSerializer, LoginSerializer
+from .models import TUsers, TArticle
+from .serializers import TUsersSerializer, LoginSerializer, ArticlesSerializers
 
 
 class UserAuthViewSet(APIView):
@@ -49,4 +49,28 @@ class TUserViewset(viewsets.ModelViewSet):
                 "status": False,
                 "messages": e,
                 "users": []
+            })
+
+
+# Articles views
+class ArticlesViewSet(viewsets.ModelViewSet):
+    queryset = TArticle.objects.all()
+    serializer_class = ArticlesSerializers
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.get_queryset()
+            serializer = self.get_serializer(queryset, many=True)
+
+            return Response({
+                "status": True,
+                "message": "ok",
+                "articles": serializer.data,
+            })
+
+        except Exception as e:
+            return Response({
+                "status": False,
+                "messages": e,
+                "articles": []
             })

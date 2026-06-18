@@ -7,6 +7,7 @@ from polls import views
 router = DefaultRouter()
 
 router.register(r'users', views.TUserViewset)
+router.register(r'articles', views.ArticlesViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
