@@ -1,4 +1,4 @@
-from .models import TUsers, TArticle
+from .models import TUsers, TArticle, TClient
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 
@@ -45,3 +45,9 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = TUsers
         fields = ['user_id', 'use_login', 'use_acc_code', 'use_enable']
+
+
+class ClientsSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = TClient
+        fields = "__all__"

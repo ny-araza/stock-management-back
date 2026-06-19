@@ -8,6 +8,8 @@ router = DefaultRouter()
 router.register(r'users', views.TUserViewset)
 router.register(r'articles', views.ArticlesViewSet)
 router.register(r'me', views.CurrentUserViewSet, basename='me')
+router.register(r'clients', views.ClientViewSet)
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),

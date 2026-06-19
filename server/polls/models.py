@@ -236,23 +236,40 @@ class TCaisse(models.Model):
 
 
 class TClient(models.Model):
-    cli_id = models.AutoField(db_column='cli_Id', primary_key=True)  # Field name made lowercase.
-    cli_code = models.CharField(db_column='cli_Code', unique=True, max_length=20, blank=True, null=True)  # Field name made lowercase.
-    cli_nom = models.CharField(db_column='cli_Nom', max_length=155, blank=True, null=True)  # Field name made lowercase.
-    cli_datecre = models.DateTimeField(db_column='cli_DateCre', blank=True, null=True)  # Field name made lowercase.
-    cli_datemdf = models.DateTimeField(db_column='cli_DateMdf', blank=True, null=True)  # Field name made lowercase.
-    cli_usercre = models.CharField(db_column='cli_UserCre', max_length=25, blank=True, null=True)  # Field name made lowercase.
-    cli_usermdf = models.CharField(db_column='cli_UserMdf', max_length=25, blank=True, null=True)  # Field name made lowercase.
-    cli_tel1 = models.CharField(db_column='cli_Tel1', max_length=25, blank=True, null=True)  # Field name made lowercase.
-    cli_tel2 = models.CharField(db_column='cli_Tel2', max_length=25, blank=True, null=True)  # Field name made lowercase.
-    cli_adresse = models.CharField(db_column='cli_Adresse', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    cli_id = models.AutoField(
+        db_column='cli_Id', primary_key=True)
+    cli_code = models.CharField(
+        db_column='cli_Code', unique=True, max_length=20,
+        blank=True, null=True)
+    cli_nom = models.CharField(
+        db_column='cli_Nom', max_length=155, blank=True, null=True)
+    cli_datecre = models.DateTimeField(
+        db_column='cli_DateCre', blank=True, null=True)
+    cli_datemdf = models.DateTimeField(
+        db_column='cli_DateMdf', blank=True, null=True)
+    cli_usercre = models.CharField(
+        db_column='cli_UserCre', max_length=25, blank=True, null=True)
+    cli_usermdf = models.CharField(
+        db_column='cli_UserMdf', max_length=25, blank=True, null=True)
+    cli_tel1 = models.CharField(
+        db_column='cli_Tel1', max_length=25, blank=True, null=True)
+    cli_tel2 = models.CharField(
+        db_column='cli_Tel2', max_length=25, blank=True, null=True)
+    cli_adresse = models.CharField(
+        db_column='cli_Adresse', max_length=50, blank=True, null=True)
     cli_enabled = models.IntegerField(blank=True, null=True)
-    cli_email = models.CharField(db_column='cli_Email', max_length=255, blank=True, null=True)  # Field name made lowercase.
-    cli_modepay = models.CharField(db_column='cli_ModePay', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    cli_nif = models.CharField(max_length=50, blank=True, null=True)
-    cli_stat = models.CharField(max_length=50, blank=True, null=True)
-    cli_rcs = models.CharField(max_length=45, blank=True, null=True)
-    cli_type = models.CharField(max_length=45, blank=True, null=True)
+    cli_email = models.CharField(
+        db_column='cli_Email', max_length=255, blank=True, null=True)
+    cli_modepay = models.CharField(
+        db_column='cli_ModePay', max_length=50, blank=True, null=True)
+    cli_nif = models.CharField(
+        max_length=50, blank=True, null=True)
+    cli_stat = models.CharField(
+        max_length=50, blank=True, null=True)
+    cli_rcs = models.CharField(
+        max_length=45, blank=True, null=True)
+    cli_type = models.CharField(
+        max_length=45, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -863,36 +880,12 @@ class TStock(models.Model):
         db_table = 't_stock'
 
 
-# class TUsers(models.Model):
-#     use_id = models.AutoField(
-#         db_column='use_Id', primary_key=True)
-#     use_login = models.CharField(
-#         db_column='use_Login', max_length=25, blank=True, null=True)
-#     use_pwd = models.CharField(
-#         max_length=512, blank=True, null=True)
-#     use_acc_code = models.CharField(
-#         max_length=25, blank=True, null=True)
-#     use_enabled = models.IntegerField(
-#         blank=True, null=True)
-#     use_datecre = models.DateTimeField(
-#         db_column='use_DateCre', blank=True, null=True)
-#     use_datemdf = models.DateTimeField(
-#         db_column='use_DateMdf', blank=True, null=True)
-#     use_usercre = models.CharField(
-#         db_column='use_UserCre', max_length=25, blank=True, null=True)
-#     use_usermdf = models.CharField(
-#         db_column='use_UserMdf', max_length=25, blank=True, null=True)
-
-#     class Meta:
-#         managed = False
-#         db_table = 't_users'
-
 class TUsers(AbstractBaseUser):
     use_id = models.AutoField(
         db_column='use_Id', primary_key=True)
     use_login = models.CharField(
         db_column='use_Login', max_length=25,
-        unique=True, blank=True, null=True)  # Ajout de unique=True si possible
+        unique=True, blank=True, null=True)
     use_pwd = models.CharField(
         max_length=512, blank=True, null=True)
     use_acc_code = models.CharField(

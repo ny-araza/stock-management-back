@@ -4,12 +4,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
-from .models import TUsers, TArticle
-from .serializers import TUsersSerializer, LoginSerializer, ArticlesSerializers
+from .models import TUsers, TArticle, TClient
+from .serializers import TUsersSerializer, LoginSerializer, \
+            ArticlesSerializers, ClientsSerializers
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.conf import settings
 from .authetification import CookieJWTAuthentification
+
 
 class UserAuthViewSet(APIView):
     permission_classes = [AllowAny]
@@ -112,7 +113,7 @@ class CurrentUserViewSet(viewsets.GenericViewSet):
             return Response({
                 "status": True,
                 "user": {
-                    "user_id": user.use_id,  # Correspond à votre modèle TUsers
+                    "user_id": user.use_id,
                     "use_login": user.use_login,
                     "use_acc_code": user.use_acc_code,
                     "use_enabled": user.use_enabled
@@ -124,3 +125,29 @@ class CurrentUserViewSet(viewsets.GenericViewSet):
                 "status": False,
                 "message": f"Impossible de récupérer l'utilisateur : {str(e)}"
             }, status=status.HTTP_400_BAD_REQUEST)
+
+
+# view client
+class ClientViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+    queryset = TClient.objects.all()
+    serializer_class = ClientsSerializers
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.get_queryset()
+            serializer = self.get_serializer(queryset, many=True)
+
+            return Response({
+                "status": True,
+                "message": "ok",
+                "articles": serializer.data,
+            })
+
+        except Exception as e:
+            return Response({
+                "status": False,
+                "messages": e,
+                "articles": []
+            })
