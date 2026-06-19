@@ -2,13 +2,14 @@
 from rest_framework import viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
 from .models import TUsers, TArticle
 from .serializers import TUsersSerializer, LoginSerializer, ArticlesSerializers
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.conf import settings
-
+from .authetification import CookieJWTAuthentification
 
 class UserAuthViewSet(APIView):
     permission_classes = [AllowAny]
@@ -93,3 +94,33 @@ class ArticlesViewSet(viewsets.ModelViewSet):
                 "messages": e,
                 "articles": []
             })
+
+
+class CurrentUserViewSet(viewsets.GenericViewSet):
+    # On force l'utilisateur à être authentifié via JWT
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+
+    def list(self, request):
+        """
+        Cette méthode intercepte le GET sur /api/me/
+        Grâce à l'authentification JWT, request.user
+        contient l'utilisateur connecté.
+        """
+        try:
+            user = request.user
+            return Response({
+                "status": True,
+                "user": {
+                    "user_id": user.use_id,  # Correspond à votre modèle TUsers
+                    "use_login": user.use_login,
+                    "use_acc_code": user.use_acc_code,
+                    "use_enabled": user.use_enabled
+                }
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                "status": False,
+                "message": f"Impossible de récupérer l'utilisateur : {str(e)}"
+            }, status=status.HTTP_400_BAD_REQUEST)

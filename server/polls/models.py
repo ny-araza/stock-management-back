@@ -6,7 +6,7 @@
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
-
+from django.contrib.auth.models import AbstractBaseUser
 
 class AuthGroup(models.Model):
     name = models.CharField(unique=True, max_length=150)
@@ -863,11 +863,36 @@ class TStock(models.Model):
         db_table = 't_stock'
 
 
-class TUsers(models.Model):
+# class TUsers(models.Model):
+#     use_id = models.AutoField(
+#         db_column='use_Id', primary_key=True)
+#     use_login = models.CharField(
+#         db_column='use_Login', max_length=25, blank=True, null=True)
+#     use_pwd = models.CharField(
+#         max_length=512, blank=True, null=True)
+#     use_acc_code = models.CharField(
+#         max_length=25, blank=True, null=True)
+#     use_enabled = models.IntegerField(
+#         blank=True, null=True)
+#     use_datecre = models.DateTimeField(
+#         db_column='use_DateCre', blank=True, null=True)
+#     use_datemdf = models.DateTimeField(
+#         db_column='use_DateMdf', blank=True, null=True)
+#     use_usercre = models.CharField(
+#         db_column='use_UserCre', max_length=25, blank=True, null=True)
+#     use_usermdf = models.CharField(
+#         db_column='use_UserMdf', max_length=25, blank=True, null=True)
+
+#     class Meta:
+#         managed = False
+#         db_table = 't_users'
+
+class TUsers(AbstractBaseUser):
     use_id = models.AutoField(
         db_column='use_Id', primary_key=True)
     use_login = models.CharField(
-        db_column='use_Login', max_length=25, blank=True, null=True)
+        db_column='use_Login', max_length=25,
+        unique=True, blank=True, null=True)  # Ajout de unique=True si possible
     use_pwd = models.CharField(
         max_length=512, blank=True, null=True)
     use_acc_code = models.CharField(
@@ -882,6 +907,22 @@ class TUsers(models.Model):
         db_column='use_UserCre', max_length=25, blank=True, null=True)
     use_usermdf = models.CharField(
         db_column='use_UserMdf', max_length=25, blank=True, null=True)
+    last_login = None
+
+    USERNAME_FIELD = 'use_login'
+    REQUIRED_FIELDS = []
+
+    @property
+    def password(self):
+        return self.use_pwd
+
+    @password.setter
+    def password(self, raw_password):
+        self.use_pwd = raw_password
+
+    @property
+    def is_active(self):
+        return bool(self.use_enabled)
 
     class Meta:
         managed = False

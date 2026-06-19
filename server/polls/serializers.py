@@ -34,3 +34,14 @@ class ArticlesSerializers(serializers.ModelSerializer):
     class Meta:
         model = TArticle
         fields = "__all__"
+
+
+class UserSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(required=True)
+    use_login = serializers.CharField(required=True)
+    use_acc_code = serializers.CharField()
+    use_enabled = serializers.BooleanField()
+
+    class Meta:
+        model = TUsers
+        fields = ['user_id', 'use_login', 'use_acc_code', 'use_enable']

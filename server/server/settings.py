@@ -34,6 +34,8 @@ SIMPLE_JWT = {
     'AUTH_COOKIE_SAMESITE': 'Lax',      # Protection CSRF
 }
 
+AUTH_USER_MODEL = 'polls.TUsers'
+
 CORS_ALLOW_METHODS = (
     "DELETE",
     "GET",
