@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -10,8 +11,28 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5174",
     "http://localhost:5173"
 ]
+CORS_ALLOW_CREDENTIALS = True
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    )
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+
+    'USER_ID_FIELD': 'use_id',
+    'AUTH_COOKIE': 'access_token',      # Nom du cookie
+    'AUTH_COOKIE_HTTP_ONLY': True,      # Bloque l'accès JavaScript (XSS)
+    'AUTH_COOKIE_SECURE': False,        # Mettre à True en production (HTTPS)
+    'AUTH_COOKIE_SAMESITE': 'Lax',      # Protection CSRF
+}
 
 CORS_ALLOW_METHODS = (
     "DELETE",

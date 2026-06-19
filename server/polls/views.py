@@ -6,18 +6,26 @@ from rest_framework.permissions import AllowAny
 from rest_framework import status
 from .models import TUsers, TArticle
 from .serializers import TUsersSerializer, LoginSerializer, ArticlesSerializers
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.conf import settings
 
 
 class UserAuthViewSet(APIView):
     permission_classes = [AllowAny]
 
-    def post(sefl, request):
+    def post(self, request):
         serializer = LoginSerializer(data=request.data)
 
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data["user"]
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception as e:
+            return Response({"detail": str(e)},
+                            status=status.HTTP_401_UNAUTHORIZED)
 
-        return Response({
+        user = serializer.validated_data["user"]
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+        response_data = {
             "status": True,
             "message": "Authentification réussi",
             "user": {
@@ -26,7 +34,18 @@ class UserAuthViewSet(APIView):
                 "use_acc_code": user.use_acc_code,
                 "use_enabled": user.use_enabled
             }
-        }, status=status.HTTP_200_OK)
+        }
+
+        response = Response(response_data, status=status.HTTP_200_OK)
+
+        response.set_cookie(
+            key='access_token',
+            value=access_token,
+            httponly=True,
+            secure=settings.SIMPLE_JWT.get('AUTH_COOKIE_SECURE', False),
+        )
+
+        return response
 
 
 class TUserViewset(viewsets.ModelViewSet):
