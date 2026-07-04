@@ -8,10 +8,11 @@ router = DefaultRouter()
 router.register(r'users', views.TUserViewset)
 router.register(r'articles', views.ArticlesViewSet)
 router.register(r'me', views.CurrentUserViewSet, basename='me')
-router.register(r'clients', views.ClientViewSet)
+router.register(r'clients', views.ClientViewSet, basename="clients")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
     path('api/login/', views.UserAuthViewSet.as_view(), name="user_login"),
+    path('api/logout/', views.LogoutView.as_view(), name="logout")
 ]

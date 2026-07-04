@@ -10,7 +10,9 @@ from .serializers import TUsersSerializer, LoginSerializer, \
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
 from .authetification import CookieJWTAuthentification
-
+from .pagination import ListPagination
+from django.utils import timezone
+from django.db.models import Q
 
 class UserAuthViewSet(APIView):
     permission_classes = [AllowAny]
@@ -77,18 +79,31 @@ class TUserViewset(viewsets.ModelViewSet):
 class ArticlesViewSet(viewsets.ModelViewSet):
     queryset = TArticle.objects.all()
     serializer_class = ArticlesSerializers
+    pagination_class = ListPagination
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
 
     def list(self, request, *args, **kwargs):
         try:
             queryset = self.get_queryset()
+            page = self.paginate_queryset(queryset)
+
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return Response({
+                    "status": True,
+                    "message": "ok",
+                    "count": self.paginator.page.paginator.count,
+                    "next": self.paginator.get_next_link(),
+                    "previous": self.paginator.get_previous_link(),
+                    "articles": serializer.data,
+                })
             serializer = self.get_serializer(queryset, many=True)
-
             return Response({
-                "status": True,
-                "message": "ok",
-                "articles": serializer.data,
+                "status": False,
+                "messages": "ok",
+                "articles": serializer.data
             })
-
         except Exception as e:
             return Response({
                 "status": False,
@@ -98,7 +113,6 @@ class ArticlesViewSet(viewsets.ModelViewSet):
 
 
 class CurrentUserViewSet(viewsets.GenericViewSet):
-    # On force l'utilisateur à être authentifié via JWT
     permission_classes = [IsAuthenticated]
     authentication_classes = [CookieJWTAuthentification]
 
@@ -133,21 +147,94 @@ class ClientViewSet(viewsets.GenericViewSet):
     authentication_classes = [CookieJWTAuthentification]
     queryset = TClient.objects.all()
     serializer_class = ClientsSerializers
+    pagination_class = ListPagination
 
     def list(self, request, *args, **kwargs):
         try:
             queryset = self.get_queryset()
-            serializer = self.get_serializer(queryset, many=True)
+            search = request.query_params.get("search", "").strip()
 
+            if search:
+                for word in search.split():
+                    queryset = queryset.filter(
+                        Q(cli_code__icontains=search) |
+                        Q(cli_nom__icontains=search) |
+                        Q(cli_email__icontains=search) |
+                        Q(cli_tel1__icontains=search) |
+                        Q(cli_tel2__icontains=search) |
+                        Q(cli_adresse__icontains=search) |
+                        Q(cli_nif__icontains=search) |
+                        Q(cli_stat__icontains=search) |
+                        Q(cli_rcs__icontains=search) |
+                        Q(cli_type__icontains=search) |
+                        Q(cli_modepay__icontains=search)
+                    )
+            queryset = queryset.order_by('cli_nom')
+            page = self.paginate_queryset(queryset)
+
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return Response({
+                    "status": True,
+                    "message": "ok",
+                    "count": self.paginator.page.paginator.count,
+                    "total_pages": self.paginator.page.paginator.num_pages,
+                    "current_page": self.paginator.page.number,
+                    "next": self.paginator.get_next_link(),
+                    "previous": self.paginator.get_previous_link(),
+                    "clients": serializer.data,
+                })
+
+            serializer = self.get_serializer(queryset, many=True)
             return Response({
                 "status": True,
                 "message": "ok",
-                "articles": serializer.data,
+                "clients": serializer.data,
             })
-
         except Exception as e:
             return Response({
                 "status": False,
-                "messages": e,
-                "articles": []
+                "message": e,
+                "clients": []
+            })
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save(
+                cli_datecre=timezone.now(),
+                cli_enabled=1
+            )
+
+            return Response({
+                "status": True,
+                "message": "Client créé avec succès",
+                "client": serializer.data
+            }, status=status.HTTP_201_CREATED)
+
+        return Response({
+            "status": False,
+            "message": "Erreur de validation",
+            "errors": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+# logOut
+class LogoutView(APIView):
+    def post(self, request):
+        try:
+            response = Response({
+                "status": True,
+                "message": "Deconexion reussie"
+                })
+
+            response.delete_cookie('access_token')
+            response.delete_cookie('refresh_token')
+
+            return response
+        except Exception as e:
+            return response({
+                "status": False,
+                "message": e
             })
