@@ -9,10 +9,14 @@ from .serializers import TUsersSerializer, LoginSerializer, \
             ArticlesSerializers, ClientsSerializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
-from .authetification import CookieJWTAuthentification
+from .authentication import CookieJWTAuthentification
 from .pagination import ListPagination
 from django.utils import timezone
 from django.db.models import Q
+from .utils import generate_reference
+from rest_framework.decorators import api_view
+from .services.dynamic_service import create_dynamic_instance
+
 
 class UserAuthViewSet(APIView):
     permission_classes = [AllowAny]
@@ -238,3 +242,76 @@ class LogoutView(APIView):
                 "status": False,
                 "message": e
             })
+
+
+# get last client code
+@api_view(["GET"])
+def generate_reference_view(request):
+    table_name = request.GET.get("table_name")
+    pk_field = request.GET.get("pk_field")
+
+    print(table_name, pk_field)
+    if not table_name or not pk_field:
+        return Response(
+            {
+                "error": "Les parametres 'table_name'"
+                "et 'pk_field' sont obligé"
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    try:
+        reference = generate_reference(table_name, pk_field)
+        print(reference)
+        return Response(
+            {
+                "reference": reference
+            },
+            status=status.HTTP_200_OK
+        )
+    except ValueError as e:
+        return Response(
+            {
+                "error": str(e)
+            },
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(["POST"])
+def dynamic_create_view(request):
+    try:
+        table_name = request.data.get("table")
+        data = request.data.get("data")
+
+        if not table_name or not data:
+            return Response(
+                {
+                    "status": False,
+                    "error": "table et data sont obligatoires"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        data.update({
+            "cli_datecre": timezone.now(),
+            "cli_usercre": request.user.use_login
+        })
+        instance = create_dynamic_instance(table_name, data)
+
+        print("this is the data ===> ", data)
+        return Response(
+            {
+                "status": True,
+                "message": "Créé avec succès",
+                "id": instance.pk
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+    except Exception as e:
+        return Response(
+            {
+                "status": False,
+                "error": str(e)
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
