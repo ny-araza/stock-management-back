@@ -1,4 +1,4 @@
-from .models import TUsers, TArticle, TClient
+from .models import TUsers, TArticle, TClient, TVente
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 
@@ -50,4 +50,10 @@ class UserSerializer(serializers.ModelSerializer):
 class ClientsSerializers(serializers.ModelSerializer):
     class Meta:
         model = TClient
+        fields = "__all__"
+
+
+class VenteSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = TVente
         fields = "__all__"

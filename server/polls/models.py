@@ -923,7 +923,8 @@ class TUsers(AbstractBaseUser):
 
 
 class TVente(models.Model):
-    vte_id = models.AutoField(db_column='vte_Id', primary_key=True)  # Field name made lowercase.
+    vte_id = models.AutoField(
+        db_column='vte_Id', primary_key=True)  # Field name made lowercase.
     vte_code = models.CharField(db_column='vte_Code', unique=True, max_length=20, blank=True, null=True)  # Field name made lowercase.
     vte_datecre = models.DateTimeField(db_column='vte_DateCre', blank=True, null=True)  # Field name made lowercase.
     vte_datemdf = models.DateTimeField(db_column='vte_DateMdf', blank=True, null=True)  # Field name made lowercase.

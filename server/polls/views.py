@@ -4,9 +4,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
-from .models import TUsers, TArticle, TClient
+from .models import TUsers, TArticle, TClient, TVente
 from .serializers import TUsersSerializer, LoginSerializer, \
-            ArticlesSerializers, ClientsSerializers
+            ArticlesSerializers, ClientsSerializers, VenteSerializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
 from .authentication import CookieJWTAuthentification
@@ -200,6 +200,78 @@ class ClientViewSet(viewsets.GenericViewSet):
                 "status": False,
                 "message": e,
                 "clients": []
+            })
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save(
+                cli_datecre=timezone.now(),
+                cli_enabled=1
+            )
+
+            return Response({
+                "status": True,
+                "message": "Client créé avec succès",
+                "client": serializer.data
+            }, status=status.HTTP_201_CREATED)
+
+        return Response({
+            "status": False,
+            "message": "Erreur de validation",
+            "errors": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+# view vente  list
+class VenteViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+    queryset = TVente.objects.all()
+    serializer_class = VenteSerializers
+    pagination_class = ListPagination
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.get_queryset()
+            search = request.query_params.get("search", "").strip()
+
+            if search:
+                for word in search.split():
+                    queryset = queryset.filter(
+                        Q(vte_code__icontains=search) |
+                        Q(vte_cli_nom__icontains=search) |
+                        Q(vte_payeclient__icontains=search) |
+                        Q(vet_operateur__icontains=search)
+                    )
+            queryset = queryset.order_by('vte_code')
+            page = self.paginate_queryset(queryset)
+
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return Response({
+                    "status": True,
+                    "message": "ok",
+                    "count": self.paginator.page.paginator.count,
+                    "total_pages": self.paginator.page.paginator.num_pages,
+                    "current_page": self.paginator.page.number,
+                    "next": self.paginator.get_next_link(),
+                    "previous": self.paginator.get_previous_link(),
+                    "ventes": serializer.data,
+                })
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                "status": True,
+                "message": "ok",
+                "ventes": serializer.data,
+            })
+        except Exception as e:
+            return Response({
+                "status": False,
+                "message": e,
+                "ventes": []
             })
 
     def create(self, request, *args, **kwargs):
