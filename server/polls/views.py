@@ -16,6 +16,9 @@ from django.db.models import Q
 from .utils import generate_reference
 from rest_framework.decorators import api_view
 from .services.dynamic_service import create_dynamic_instance
+from django_filters.rest_framework import DjangoFilterBackend
+from .filters import VenteFilter
+from rest_framework.filters import OrderingFilter
 
 
 class UserAuthViewSet(APIView):
@@ -231,10 +234,17 @@ class VenteViewSet(viewsets.GenericViewSet):
     queryset = TVente.objects.all()
     serializer_class = VenteSerializers
     pagination_class = ListPagination
+    # Activation des filtres et du tri
+    filter_backends = [
+        DjangoFilterBackend,
+        OrderingFilter,
+    ]
 
+    filterset_class = VenteFilter
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.get_queryset()
+            # queryset = self.get_queryset()
+            queryset = self.filter_queryset(self.get_queryset())
             search = request.query_params.get("search", "").strip()
 
             if search:
