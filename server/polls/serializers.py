@@ -1,4 +1,5 @@
-from .models import TUsers, TArticle, TClient, TVente, TCmdFournis
+from .models import TUsers, TArticle, TClient, \
+                TVente, TCmdFournis, TFournis
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 
@@ -62,4 +63,10 @@ class VenteSerializers(serializers.ModelSerializer):
 class BcSerializers(serializers.ModelSerializer):
     class Meta:
         model = TCmdFournis
+        fields = "__all__"
+
+
+class FournisseurSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = TFournis
         fields = "__all__"

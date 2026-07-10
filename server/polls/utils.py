@@ -49,7 +49,8 @@ def generate_reference(
         .values_list(pk_field, flat=True)
         .first()
     )
-    temp = int(last.replace("CL", ""))
+    prefix = get_table_prefix(table_name)
+    temp = int(last.replace(prefix, ""))
 
     next_id = 1 if temp is None else temp + 1
 

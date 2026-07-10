@@ -4,9 +4,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
-from .models import TUsers, TArticle, TClient, TVente, TCmdFournis
+from .models import TUsers, TArticle, TClient, TVente, TCmdFournis, \
+            TFournis
 from .serializers import TUsersSerializer, LoginSerializer, \
-            ArticlesSerializers, ClientsSerializers, VenteSerializers, BcSerializers
+            ArticlesSerializers, ClientsSerializers, VenteSerializers, \
+            BcSerializers, FournisseurSerializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
 from .authentication import CookieJWTAuthentification
@@ -17,7 +19,7 @@ from .utils import generate_reference
 from rest_framework.decorators import api_view
 from .services.dynamic_service import create_dynamic_instance
 from django_filters.rest_framework import DjangoFilterBackend
-from .filters import VenteFilter, ClientFilter, BcFilter
+from .filters import VenteFilter, ClientFilter, BcFilter, FournisseurFilter
 from rest_framework.filters import OrderingFilter
 
 
@@ -351,6 +353,62 @@ class BcViewSet(viewsets.GenericViewSet):
             })
 
 
+# liste BC
+class FournisseurViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+    queryset = TFournis.objects.all()
+    serializer_class = FournisseurSerializers
+    pagination_class = ListPagination
+    # Activation des filtres et du tri
+    filter_backends = [
+        DjangoFilterBackend,
+        OrderingFilter,
+    ]
+
+    filterset_class = FournisseurFilter
+
+    def list(self, request, *args, **kwargs):
+        try:
+            # queryset = self.get_queryset()
+            queryset = self.filter_queryset(self.get_queryset())
+            search = request.query_params.get("search", "").strip()
+
+            if search:
+                for word in search.split():
+                    queryset = queryset.filter(
+                        Q(cmf_code__icontains=search)
+                    )
+            queryset = queryset.order_by('fou_code')
+            page = self.paginate_queryset(queryset)
+
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return Response({
+                    "status": True,
+                    "message": "ok",
+                    "count": self.paginator.page.paginator.count,
+                    "total_pages": self.paginator.page.paginator.num_pages,
+                    "current_page": self.paginator.page.number,
+                    "next": self.paginator.get_next_link(),
+                    "previous": self.paginator.get_previous_link(),
+                    "fournisseur": serializer.data,
+                })
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                "status": True,
+                "message": "ok",
+                "fournisseur": serializer.data,
+            })
+        except Exception as e:
+            return Response({
+                "status": False,
+                "message": str(e),
+                "fournisseur": []
+            })
+
+
 # logOut
 class LogoutView(APIView):
     def post(self, request):
@@ -410,7 +468,15 @@ def dynamic_create_view(request):
         table_name = request.data.get("table")
         data = request.data.get("data")
 
-        if not table_name or not data:
+        # get the 3 first word in table
+        prefix = ""
+        try:
+            for i in range(2, 5):
+                prefix += table_name[i]
+        except Exception:
+            raise Exception("Table name no conforme with norm")
+
+        if not table_name or not data or not prefix:
             return Response(
                 {
                     "status": False,
@@ -419,8 +485,8 @@ def dynamic_create_view(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         data.update({
-            "cli_datecre": timezone.now(),
-            "cli_usercre": request.user.use_login
+            f"{prefix}_datecre": timezone.now(),
+            f"{prefix}_usercre": request.user.use_login
         })
         instance = create_dynamic_instance(table_name, data)
 

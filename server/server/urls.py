@@ -11,6 +11,11 @@ router.register(r'me', views.CurrentUserViewSet, basename='me')
 router.register(r'clients', views.ClientViewSet, basename="clients")
 router.register(r'ventes', views.VenteViewSet, basename="ventes")
 router.register(r'bc-list', views.BcViewSet, basename="bc-list")
+router.register(
+    r'fournisseurs',
+    views.FournisseurViewSet,
+    basename="founrisseurs"
+    )
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -23,7 +28,7 @@ urlpatterns = [
         name="generate-reference"
     ),
     path(
-        "api/create-client/",
+        "api/create-client-fournis/",
         views.dynamic_create_view,
         name="dynamic-create-client"
         ),

@@ -1,6 +1,6 @@
 from django.db import models
 from django_filters import rest_framework as filters
-from .models import TVente, TClient, TCmdFournis
+from .models import TVente, TClient, TCmdFournis, TFournis
 
 
 class ClientFilter(filters.FilterSet):
@@ -141,6 +141,50 @@ class BcFilter(filters.FilterSet):
         model = TCmdFournis
         exclude = [
             "cmf_id",
+        ]
+
+        filter_overrides = {
+            models.CharField: {
+                "filter_class": filters.CharFilter,
+                "extra": lambda f: {
+                    "lookup_expr": "icontains"
+                },
+            },
+
+            models.DecimalField: {
+                "filter_class": filters.NumberFilter,
+            },
+
+            models.DateField: {
+                "filter_class": filters.DateFilter,
+            },
+
+            models.DateTimeField: {
+                "filter_class": filters.DateFilter,
+                "extra": lambda f: {
+                    "lookup_expr": "date"
+                },
+            },
+        }
+
+
+class FournisseurFilter(filters.FilterSet):
+
+    fou_enabled = filters.NumberFilter()
+    fou_datecre_year = filters.NumberFilter(
+        field_name="fou_datecre", lookup_expr="year")
+    fou_datecre_month = filters.NumberFilter(
+        field_name="fou_datecre", lookup_expr="month")
+
+    fou_datemdf_year = filters.NumberFilter(
+        field_name="fou_datemdf", lookup_expr="year")
+    fou_datemdf_month = filters.NumberFilter(
+        field_name="fou_datemdf", lookup_expr="month")
+
+    class Meta:
+        model = TFournis
+        exclude = [
+            "fou_id",
         ]
 
         filter_overrides = {
