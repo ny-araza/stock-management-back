@@ -1,6 +1,6 @@
 from django.db import models
 from django_filters import rest_framework as filters
-from .models import TVente, TClient
+from .models import TVente, TClient, TCmdFournis
 
 
 class ClientFilter(filters.FilterSet):
@@ -86,6 +86,61 @@ class VenteFilter(filters.FilterSet):
             "vte_id",
             "ve_proforma",
             "ve_remise",
+        ]
+
+        filter_overrides = {
+            models.CharField: {
+                "filter_class": filters.CharFilter,
+                "extra": lambda f: {
+                    "lookup_expr": "icontains"
+                },
+            },
+
+            models.DecimalField: {
+                "filter_class": filters.NumberFilter,
+            },
+
+            models.DateField: {
+                "filter_class": filters.DateFilter,
+            },
+
+            models.DateTimeField: {
+                "filter_class": filters.DateFilter,
+                "extra": lambda f: {
+                    "lookup_expr": "date"
+                },
+            },
+        }
+
+
+class BcFilter(filters.FilterSet):
+
+    cmf_isLivre = filters.NumberFilter()
+    cmf_enabled = filters.NumberFilter()
+    cmf_datecre_year = filters.NumberFilter(
+        field_name="cmf_datecre", lookup_expr="year")
+    cmf_datecre_month = filters.NumberFilter(
+        field_name="cmf_datecre", lookup_expr="month")
+
+    cmf_datemd_year = filters.NumberFilter(
+        field_name="cmf_datemdf", lookup_expr="year")
+    cmf_datemd_month = filters.NumberFilter(
+        field_name="cmf_datemdf", lookup_expr="month")
+
+    cmf_dateliv_year = filters.NumberFilter(
+        field_name="cmf_dateliv", lookup_expr="year")
+    cmf_dateliv_month = filters.NumberFilter(
+        field_name="cmf_dateliv", lookup_expr="month")
+
+    cmf_date_year = filters.NumberFilter(
+        field_name="cmf_date", lookup_expr="year")
+    cmf_date_month = filters.NumberFilter(
+        field_name="cmf_date", lookup_expr="month")
+
+    class Meta:
+        model = TCmdFournis
+        exclude = [
+            "cmf_id",
         ]
 
         filter_overrides = {

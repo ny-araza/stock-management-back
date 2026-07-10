@@ -10,6 +10,7 @@ router.register(r'articles', views.ArticlesViewSet)
 router.register(r'me', views.CurrentUserViewSet, basename='me')
 router.register(r'clients', views.ClientViewSet, basename="clients")
 router.register(r'ventes', views.VenteViewSet, basename="ventes")
+router.register(r'bc-list', views.BcViewSet, basename="bc-list")
 
 urlpatterns = [
     path('admin/', admin.site.urls),

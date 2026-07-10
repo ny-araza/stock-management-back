@@ -4,9 +4,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
-from .models import TUsers, TArticle, TClient, TVente
+from .models import TUsers, TArticle, TClient, TVente, TCmdFournis
 from .serializers import TUsersSerializer, LoginSerializer, \
-            ArticlesSerializers, ClientsSerializers, VenteSerializers
+            ArticlesSerializers, ClientsSerializers, VenteSerializers, BcSerializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
 from .authentication import CookieJWTAuthentification
@@ -17,7 +17,7 @@ from .utils import generate_reference
 from rest_framework.decorators import api_view
 from .services.dynamic_service import create_dynamic_instance
 from django_filters.rest_framework import DjangoFilterBackend
-from .filters import VenteFilter, ClientFilter
+from .filters import VenteFilter, ClientFilter, BcFilter
 from rest_framework.filters import OrderingFilter
 
 
@@ -250,6 +250,7 @@ class VenteViewSet(viewsets.GenericViewSet):
     ]
 
     filterset_class = VenteFilter
+
     def list(self, request, *args, **kwargs):
         try:
             # queryset = self.get_queryset()
@@ -293,26 +294,61 @@ class VenteViewSet(viewsets.GenericViewSet):
                 "ventes": []
             })
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
 
-        if serializer.is_valid():
-            serializer.save(
-                cli_datecre=timezone.now(),
-                cli_enabled=1
-            )
+# liste BC
+class BcViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+    queryset = TCmdFournis.objects.all()
+    serializer_class = BcSerializers
+    pagination_class = ListPagination
+    # Activation des filtres et du tri
+    filter_backends = [
+        DjangoFilterBackend,
+        OrderingFilter,
+    ]
 
+    filterset_class = BcFilter
+
+    def list(self, request, *args, **kwargs):
+        try:
+            # queryset = self.get_queryset()
+            queryset = self.filter_queryset(self.get_queryset())
+            search = request.query_params.get("search", "").strip()
+
+            if search:
+                for word in search.split():
+                    queryset = queryset.filter(
+                        Q(cmf_code__icontains=search)
+                    )
+            queryset = queryset.order_by('cmf_code')
+            page = self.paginate_queryset(queryset)
+
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return Response({
+                    "status": True,
+                    "message": "ok",
+                    "count": self.paginator.page.paginator.count,
+                    "total_pages": self.paginator.page.paginator.num_pages,
+                    "current_page": self.paginator.page.number,
+                    "next": self.paginator.get_next_link(),
+                    "previous": self.paginator.get_previous_link(),
+                    "bc_list": serializer.data,
+                })
+
+            serializer = self.get_serializer(queryset, many=True)
             return Response({
                 "status": True,
-                "message": "Client créé avec succès",
-                "client": serializer.data
-            }, status=status.HTTP_201_CREATED)
-
-        return Response({
-            "status": False,
-            "message": "Erreur de validation",
-            "errors": serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
+                "message": "ok",
+                "bc_list": serializer.data,
+            })
+        except Exception as e:
+            return Response({
+                "status": False,
+                "message": str(e),
+                "bc_list": []
+            })
 
 
 # logOut
