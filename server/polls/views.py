@@ -5,21 +5,23 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
 from .models import TUsers, TArticle, TClient, TVente, TCmdFournis, \
-            TFournis
+            TFournis, TFamille, TSousFamille
 from .serializers import TUsersSerializer, LoginSerializer, \
             ArticlesSerializers, ClientsSerializers, VenteSerializers, \
-            BcSerializers, FournisseurSerializers
+            BcSerializers, FournisseurSerializers, FamilleSerializers, \
+            SousFamilleSerializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
 from .authentication import CookieJWTAuthentification
 from .pagination import ListPagination
 from django.utils import timezone
 from django.db.models import Q
-from .utils import generate_reference
+from .utils import generate_reference, generate_enumeration_value
 from rest_framework.decorators import api_view
 from .services.dynamic_service import create_dynamic_instance
 from django_filters.rest_framework import DjangoFilterBackend
-from .filters import VenteFilter, ClientFilter, BcFilter, FournisseurFilter
+from .filters import VenteFilter, ClientFilter, BcFilter, \
+            FournisseurFilter, ArticleFilter
 from rest_framework.filters import OrderingFilter
 
 
@@ -92,9 +94,18 @@ class ArticlesViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     authentication_classes = [CookieJWTAuthentification]
 
+    filter_backends = [
+        DjangoFilterBackend,
+        OrderingFilter,
+    ]
+
+    filterset_class = ArticleFilter
+
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.get_queryset()
+            # queryset = self.get_queryset()
+            queryset = self.filter_queryset(self.get_queryset())
+            queryset = queryset.order_by('art_nom')
             page = self.paginate_queryset(queryset)
 
             if page is not None:
@@ -103,6 +114,8 @@ class ArticlesViewSet(viewsets.ModelViewSet):
                     "status": True,
                     "message": "ok",
                     "count": self.paginator.page.paginator.count,
+                    "total_pages": self.paginator.page.paginator.num_pages,
+                    "current_page": self.paginator.page.number,
                     "next": self.paginator.get_next_link(),
                     "previous": self.paginator.get_previous_link(),
                     "articles": serializer.data,
@@ -409,6 +422,60 @@ class FournisseurViewSet(viewsets.GenericViewSet):
             })
 
 
+class FamilleViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+    queryset = TFamille.objects.all()
+    serializer_class = FamilleSerializers
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.get_queryset()
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                "status": True,
+                "message": "ok",
+                "famille": serializer.data,
+            })
+        except Exception as e:
+            return Response({
+                "status": False,
+                "message": str(e),
+                "famille": []
+            })
+
+
+class SousFamilleViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+    queryset = TSousFamille.objects.all()
+    serializer_class = SousFamilleSerializers
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.get_queryset()
+            search = request.query_params.get("search", "").strip()
+
+            if search:
+                for word in search.split():
+                    queryset = queryset.filter(
+                        Q(sof_fam_id__icontains=search)
+                    )
+            queryset = queryset.order_by('sof_nom')
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                "status": True,
+                "message": "ok",
+                "sous_famille": serializer.data,
+            })
+        except Exception as e:
+            return Response({
+                "status": False,
+                "message": str(e),
+                "sous_famille": []
+            })
+
+
 # logOut
 class LogoutView(APIView):
     def post(self, request):
@@ -462,6 +529,27 @@ def generate_reference_view(request):
         )
 
 
+@api_view(['GET'])
+def generate_enumeration(request):
+    enu_code = request.GET.get("enu_code")
+    if not enu_code:
+        return Response(
+            {
+                "success": False,
+                "error": "enu_code ne doit pas etre vide",
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    result = generate_enumeration_value(enu_code)
+    return Response(
+        {
+            "success": True,
+            "nom_enumeration": result
+        },
+        status=status.HTTP_200_OK
+    )
+
+
 @api_view(["POST"])
 def dynamic_create_view(request):
     try:
@@ -471,8 +559,11 @@ def dynamic_create_view(request):
         # get the 3 first word in table
         prefix = ""
         try:
-            for i in range(2, 5):
-                prefix += table_name[i]
+            if table_name != "t_sous_famille":
+                for i in range(2, 5):
+                    prefix += table_name[i]
+            else:
+                prefix = "sof"
         except Exception:
             raise Exception("Table name no conforme with norm")
 
@@ -490,7 +581,6 @@ def dynamic_create_view(request):
         })
         instance = create_dynamic_instance(table_name, data)
 
-        print("this is the data ===> ", data)
         return Response(
             {
                 "status": True,

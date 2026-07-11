@@ -1,4 +1,4 @@
-from .models import TLien
+from .models import TLien, TEnumeration
 from django.apps import apps
 
 
@@ -55,3 +55,19 @@ def generate_reference(
     next_id = 1 if temp is None else temp + 1
 
     return f"{prefix}{next_id:04d}"
+
+
+def generate_enumeration_value(enu_code: str) -> list[dict[str, str]]:
+    try:
+        prefix = TEnumeration.objects.filter(
+            enu_code=enu_code
+        ).values_list("enu_nom", "enu_id")
+        result = []
+        for p in prefix:
+            temp = {}
+            temp.update({"enu_id": p[1], "enu_nom": p[0]})
+            result.append(temp)
+    except TLien.DoesNotExist:
+        raise ValueError(f"Aucun préfixe trouvé pour la table '{enu_code}'")
+    print(result)
+    return result

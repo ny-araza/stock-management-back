@@ -16,6 +16,16 @@ router.register(
     views.FournisseurViewSet,
     basename="founrisseurs"
     )
+router.register(
+    r'familles',
+    views.FamilleViewSet,
+    basename="familles"
+    )
+router.register(
+    r'sous-familles',
+    views.SousFamilleViewSet,
+    basename="sous-familles"
+    )
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -28,8 +38,13 @@ urlpatterns = [
         name="generate-reference"
     ),
     path(
+        "api/generate-enumeration/",
+        views.generate_enumeration,
+        name="generate-enumeration"
+    ),
+    path(
         "api/create-client-fournis/",
         views.dynamic_create_view,
-        name="dynamic-create-client"
+        name="dynamic-create-client-fournis"
         ),
 ]
