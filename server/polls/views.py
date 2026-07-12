@@ -598,3 +598,29 @@ def dynamic_create_view(request):
             },
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
+class NombreVenteAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            result = {}
+            nombre_ventes = TVente.objects.count()
+            nombre_cmd = TCmdFournis.objects.count()
+            nombre_frns = TFournis.objects.count()
+            nombre_clts = TClient.objects.count()
+            result.update({
+                "nombre_ventes": nombre_ventes,
+                "nombre_cmd": nombre_cmd,
+                "nombre_frns": nombre_frns,
+                "nombre_clts": nombre_clts
+            })
+            return Response({
+                "nombre": result,
+            })
+
+        except Exception as e:
+            return Response({
+                "error": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)

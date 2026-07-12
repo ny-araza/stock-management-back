@@ -47,4 +47,8 @@ urlpatterns = [
         views.dynamic_create_view,
         name="dynamic-create-client-fournis"
         ),
+    path(
+        "api/nombres/",
+        views.NombreVenteAPIView.as_view(),
+        name="nombre"),
 ]
