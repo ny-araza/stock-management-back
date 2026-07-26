@@ -27,6 +27,7 @@ router.register(
     basename="sous-familles"
     )
 
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
@@ -38,12 +39,17 @@ urlpatterns = [
         name="generate-reference"
     ),
     path(
+        "api/generate-date-code/",
+        views.generate_date_code,
+        name="generate-date-code"
+    ),
+    path(
         "api/generate-enumeration/",
         views.generate_enumeration,
         name="generate-enumeration"
     ),
     path(
-        "api/create-client-fournis/",
+        "api/insert-database/",
         views.dynamic_create_view,
         name="dynamic-create-client-fournis"
         ),
@@ -51,4 +57,9 @@ urlpatterns = [
         "api/nombres/",
         views.NombreVenteAPIView.as_view(),
         name="nombre"),
+    path(
+        "api/articles-autocomplete/",
+        views.ArticleAutoComplete.as_view(),
+        name="articles-autocomplete"
+    )
 ]

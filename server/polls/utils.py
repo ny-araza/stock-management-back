@@ -1,5 +1,6 @@
-from .models import TLien, TEnumeration
+from .models import TLien, TEnumeration, TCode
 from django.apps import apps
+from django.utils import timezone
 
 
 def get_table_prefix(table_name: str) -> str:
@@ -69,5 +70,62 @@ def generate_enumeration_value(enu_code: str) -> list[dict[str, str]]:
             result.append(temp)
     except TLien.DoesNotExist:
         raise ValueError(f"Aucun préfixe trouvé pour la table '{enu_code}'")
-    print(result)
     return result
+
+
+# get code
+
+def get_dernier_code(nom_table: str, isInsert: bool):
+    """
+    Retourne la dernière ligne correspondant à une table.
+    Retourne None si aucune ligne n'existe.
+    """
+
+    maintenant = timezone.now()
+    annee_actuelle = maintenant.year
+    mois_actuel = maintenant.month
+
+    dernier_code = TCode.objects \
+                        .filter(cod_table=nom_table) \
+                        .order_by("cod_annee", "cod_mois", "cod_id").last()
+
+    if dernier_code is None:
+        dernier_code = TCode.objects.create(
+            cod_table=nom_table,
+            cod_num=1,
+            cod_annee=annee_actuelle,
+            cod_mois=mois_actuel,
+        )
+    elif (
+        dernier_code.cod_annee == annee_actuelle
+        and dernier_code.cod_mois == mois_actuel
+    ):
+        if isInsert:
+            dernier_code.cod_num = str(int(dernier_code.cod_num) + 1)
+            dernier_code.save(update_fields=["cod_num"])
+    else:
+        dernier_code = TCode.objects.create(
+            cod_table=nom_table,
+            cod_num=1,
+            cod_annee=annee_actuelle,
+            cod_mois=mois_actuel,
+        )
+
+    return (
+        {
+            "cod_table": dernier_code.cod_table,
+            "cod_num": dernier_code.cod_num,
+            "cod_annee": dernier_code.cod_annee,
+            "cod_mois": dernier_code.cod_mois
+        }
+    )
+
+
+def generate_code_date(nom_table: str, isInsert: bool):
+    dernier_code = get_dernier_code(nom_table, isInsert)
+    prefix = get_table_prefix(nom_table)
+
+    return (
+        f"{prefix}{str(dernier_code['cod_annee'])[2:4]}"
+        f"{dernier_code['cod_mois']}{int(dernier_code['cod_num']):04d}"
+    )

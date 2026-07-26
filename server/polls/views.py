@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
 from .models import TUsers, TArticle, TClient, TVente, TCmdFournis, \
-            TFournis, TFamille, TSousFamille
+            TFournis, TFamille, TSousFamille, TPrix
 from .serializers import TUsersSerializer, LoginSerializer, \
             ArticlesSerializers, ClientsSerializers, VenteSerializers, \
             BcSerializers, FournisseurSerializers, FamilleSerializers, \
@@ -16,7 +16,8 @@ from .authentication import CookieJWTAuthentification
 from .pagination import ListPagination
 from django.utils import timezone
 from django.db.models import Q
-from .utils import generate_reference, generate_enumeration_value
+from .utils import generate_reference, generate_enumeration_value, \
+        generate_code_date
 from rest_framework.decorators import api_view
 from .services.dynamic_service import create_dynamic_instance
 from django_filters.rest_framework import DjangoFilterBackend
@@ -555,15 +556,17 @@ def dynamic_create_view(request):
     try:
         table_name = request.data.get("table")
         data = request.data.get("data")
-
+        print("===> data ", data)
         # get the 3 first word in table
         prefix = ""
         try:
-            if table_name != "t_sous_famille":
+            if table_name == 't_sous_famille':
+                prefix = 'sof'
+            elif table_name == 't_in_stock':
+                prefix = 'in'
+            else:
                 for i in range(2, 5):
                     prefix += table_name[i]
-            else:
-                prefix = "sof"
         except Exception:
             raise Exception("Table name no conforme with norm")
 
@@ -624,3 +627,59 @@ class NombreVenteAPIView(APIView):
             return Response({
                 "error": str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def generate_date_code(request):
+    table_name = request.GET.get("table_name")
+    is_insert = request.GET.get("is_insert")
+
+    if is_insert == "0":
+        is_insert = False
+    else:
+        is_insert = True
+
+    if not table_name:
+        return Response(
+            {
+                "success": False,
+                "error": "table_name ne doit pas etre vide",
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    result = generate_code_date(table_name, is_insert)
+    return Response(
+        {
+            "success": True,
+            "code": result
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+class ArticleAutoComplete(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        search = request.GET.get("search", "")
+        print(search)
+        articles = (
+            TPrix.objects
+            .filter(pri_art_code__icontains=search)
+            .values(
+                "pri_id",
+                "pri_art_code",
+                "pri_achat"
+            )
+        )
+        return Response({
+            "status": True,
+            "articles": [
+                {
+                    "id": a["pri_id"],
+                    "code": a["pri_art_code"],
+                    "prix_ht": a["pri_achat"]
+                }
+                for a in articles
+            ]
+        })
