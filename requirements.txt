@@ -1,4 +1,5 @@
 django
-mysqlclient
-
-
+django-filter
+django-cors-headers
+djangorestframework
+djangorestframework-simplejwt
