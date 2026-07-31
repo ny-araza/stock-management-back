@@ -1,29 +1,49 @@
 # from django.shortcuts import render
-from rest_framework import viewsets
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework import status
-from .models import TUsers, TArticle, TClient, TVente, TCmdFournis, \
-            TFournis, TFamille, TSousFamille, TPrix
-from .serializers import TUsersSerializer, LoginSerializer, \
-            ArticlesSerializers, ClientsSerializers, VenteSerializers, \
-            BcSerializers, FournisseurSerializers, FamilleSerializers, \
-            SousFamilleSerializers
-from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
-from .authentication import CookieJWTAuthentification
-from .pagination import ListPagination
-from django.utils import timezone
 from django.db.models import Q
-from .utils import generate_reference, generate_enumeration_value, \
-        generate_code_date
-from rest_framework.decorators import api_view
-from .services.dynamic_service import create_dynamic_instance
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from .filters import VenteFilter, ClientFilter, BcFilter, \
-            FournisseurFilter, ArticleFilter
+from rest_framework import status, viewsets
+from rest_framework.decorators import api_view
 from rest_framework.filters import OrderingFilter
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from .authentication import CookieJWTAuthentification
+from .filters import (
+    ArticleFilter,
+    BcFilter,
+    ClientFilter,
+    FournisseurFilter,
+    VenteFilter,
+)
+from .models import (
+    TArticle,
+    TClient,
+    TCmdFournis,
+    TFamille,
+    TFournis,
+    TPrix,
+    TSousFamille,
+    TUsers,
+    TVente,
+)
+from .pagination import ListPagination
+from .serializers import (
+    ArticlesSerializers,
+    BcSerializers,
+    ClientsSerializers,
+    FamilleSerializers,
+    FournisseurSerializers,
+    LoginSerializer,
+    SousFamilleSerializers,
+    TUsersSerializer,
+    VenteSerializers,
+)
+from .services.dynamic_service import create_dynamic_instance
+from .utils import generate_code_date, generate_enumeration_value, generate_reference
 
 
 class UserAuthViewSet(APIView):
@@ -35,8 +55,7 @@ class UserAuthViewSet(APIView):
         try:
             serializer.is_valid(raise_exception=True)
         except Exception as e:
-            return Response({"detail": str(e)},
-                            status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
         user = serializer.validated_data["user"]
         refresh = RefreshToken.for_user(user)
@@ -48,17 +67,17 @@ class UserAuthViewSet(APIView):
                 "user_id": user.use_id,
                 "use_login": user.use_login,
                 "use_acc_code": user.use_acc_code,
-                "use_enabled": user.use_enabled
-            }
+                "use_enabled": user.use_enabled,
+            },
         }
 
         response = Response(response_data, status=status.HTTP_200_OK)
 
         response.set_cookie(
-            key='access_token',
+            key="access_token",
             value=access_token,
             httponly=True,
-            secure=settings.SIMPLE_JWT.get('AUTH_COOKIE_SECURE', False),
+            secure=settings.SIMPLE_JWT.get("AUTH_COOKIE_SECURE", False),
         )
 
         return response
@@ -73,18 +92,16 @@ class TUserViewset(viewsets.ModelViewSet):
             queryset = self.get_queryset()
             serializer = self.get_serializer(queryset, many=True)
 
-            return Response({
-                "status": True,
-                "message": "ok",
-                "users": serializer.data,
-            })
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "users": serializer.data,
+                }
+            )
 
         except Exception as e:
-            return Response({
-                "status": False,
-                "messages": e,
-                "users": []
-            })
+            return Response({"status": False, "messages": e, "users": []})
 
 
 # Articles views
@@ -106,33 +123,29 @@ class ArticlesViewSet(viewsets.ModelViewSet):
         try:
             # queryset = self.get_queryset()
             queryset = self.filter_queryset(self.get_queryset())
-            queryset = queryset.order_by('art_nom')
+            queryset = queryset.order_by("art_nom")
             page = self.paginate_queryset(queryset)
 
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
-                return Response({
-                    "status": True,
-                    "message": "ok",
-                    "count": self.paginator.page.paginator.count,
-                    "total_pages": self.paginator.page.paginator.num_pages,
-                    "current_page": self.paginator.page.number,
-                    "next": self.paginator.get_next_link(),
-                    "previous": self.paginator.get_previous_link(),
-                    "articles": serializer.data,
-                })
+                return Response(
+                    {
+                        "status": True,
+                        "message": "ok",
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "articles": serializer.data,
+                    }
+                )
             serializer = self.get_serializer(queryset, many=True)
-            return Response({
-                "status": False,
-                "messages": "ok",
-                "articles": serializer.data
-            })
+            return Response(
+                {"status": False, "messages": "ok", "articles": serializer.data}
+            )
         except Exception as e:
-            return Response({
-                "status": False,
-                "messages": e,
-                "articles": []
-            })
+            return Response({"status": False, "messages": e, "articles": []})
 
 
 class CurrentUserViewSet(viewsets.GenericViewSet):
@@ -147,21 +160,27 @@ class CurrentUserViewSet(viewsets.GenericViewSet):
         """
         try:
             user = request.user
-            return Response({
-                "status": True,
-                "user": {
-                    "user_id": user.use_id,
-                    "use_login": user.use_login,
-                    "use_acc_code": user.use_acc_code,
-                    "use_enabled": user.use_enabled
-                }
-            }, status=status.HTTP_200_OK)
+            return Response(
+                {
+                    "status": True,
+                    "user": {
+                        "user_id": user.use_id,
+                        "use_login": user.use_login,
+                        "use_acc_code": user.use_acc_code,
+                        "use_enabled": user.use_enabled,
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
-            return Response({
-                "status": False,
-                "message": f"Impossible de récupérer l'utilisateur : {str(e)}"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "status": False,
+                    "message": f"Impossible de récupérer l'utilisateur : {str(e)}",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 # view client
@@ -189,67 +208,70 @@ class ClientViewSet(viewsets.GenericViewSet):
             if search:
                 for word in search.split():
                     queryset = queryset.filter(
-                        Q(cli_code__icontains=search) |
-                        Q(cli_nom__icontains=search) |
-                        Q(cli_email__icontains=search) |
-                        Q(cli_tel1__icontains=search) |
-                        Q(cli_tel2__icontains=search) |
-                        Q(cli_adresse__icontains=search) |
-                        Q(cli_nif__icontains=search) |
-                        Q(cli_stat__icontains=search) |
-                        Q(cli_rcs__icontains=search) |
-                        Q(cli_type__icontains=search) |
-                        Q(cli_modepay__icontains=search)
+                        Q(cli_code__icontains=search)
+                        | Q(cli_nom__icontains=search)
+                        | Q(cli_email__icontains=search)
+                        | Q(cli_tel1__icontains=search)
+                        | Q(cli_tel2__icontains=search)
+                        | Q(cli_adresse__icontains=search)
+                        | Q(cli_nif__icontains=search)
+                        | Q(cli_stat__icontains=search)
+                        | Q(cli_rcs__icontains=search)
+                        | Q(cli_type__icontains=search)
+                        | Q(cli_modepay__icontains=search)
                     )
-            queryset = queryset.order_by('cli_nom')
+            queryset = queryset.order_by("cli_nom")
             page = self.paginate_queryset(queryset)
 
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
-                return Response({
-                    "status": True,
-                    "message": "ok",
-                    "count": self.paginator.page.paginator.count,
-                    "total_pages": self.paginator.page.paginator.num_pages,
-                    "current_page": self.paginator.page.number,
-                    "next": self.paginator.get_next_link(),
-                    "previous": self.paginator.get_previous_link(),
-                    "clients": serializer.data,
-                })
+                return Response(
+                    {
+                        "status": True,
+                        "message": "ok",
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "clients": serializer.data,
+                    }
+                )
 
             serializer = self.get_serializer(queryset, many=True)
-            return Response({
-                "status": True,
-                "message": "ok",
-                "clients": serializer.data,
-            })
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "clients": serializer.data,
+                }
+            )
         except Exception as e:
-            return Response({
-                "status": False,
-                "message": e,
-                "clients": []
-            })
+            return Response({"status": False, "message": e, "clients": []})
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
 
         if serializer.is_valid():
-            serializer.save(
-                cli_datecre=timezone.now(),
-                cli_enabled=1
+            serializer.save(cli_datecre=timezone.now(), cli_enabled=1)
+
+            return Response(
+                {
+                    "status": True,
+                    "message": "Client créé avec succès",
+                    "client": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
             )
 
-            return Response({
-                "status": True,
-                "message": "Client créé avec succès",
-                "client": serializer.data
-            }, status=status.HTTP_201_CREATED)
-
-        return Response({
-            "status": False,
-            "message": "Erreur de validation",
-            "errors": serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "status": False,
+                "message": "Erreur de validation",
+                "errors": serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
 # view vente  list
@@ -276,39 +298,39 @@ class VenteViewSet(viewsets.GenericViewSet):
             if search:
                 for word in search.split():
                     queryset = queryset.filter(
-                        Q(vte_code__icontains=search) |
-                        Q(vte_cli_nom__icontains=search) |
-                        Q(vte_payeclient__icontains=search) |
-                        Q(vet_operateur__icontains=search)
+                        Q(vte_code__icontains=search)
+                        | Q(vte_cli_nom__icontains=search)
+                        | Q(vte_payeclient__icontains=search)
+                        | Q(vet_operateur__icontains=search)
                     )
-            queryset = queryset.order_by('vte_code')
+            queryset = queryset.order_by("vte_code")
             page = self.paginate_queryset(queryset)
 
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
-                return Response({
-                    "status": True,
-                    "message": "ok",
-                    "count": self.paginator.page.paginator.count,
-                    "total_pages": self.paginator.page.paginator.num_pages,
-                    "current_page": self.paginator.page.number,
-                    "next": self.paginator.get_next_link(),
-                    "previous": self.paginator.get_previous_link(),
-                    "ventes": serializer.data,
-                })
+                return Response(
+                    {
+                        "status": True,
+                        "message": "ok",
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "ventes": serializer.data,
+                    }
+                )
 
             serializer = self.get_serializer(queryset, many=True)
-            return Response({
-                "status": True,
-                "message": "ok",
-                "ventes": serializer.data,
-            })
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "ventes": serializer.data,
+                }
+            )
         except Exception as e:
-            return Response({
-                "status": False,
-                "message": e,
-                "ventes": []
-            })
+            return Response({"status": False, "message": e, "ventes": []})
 
 
 # liste BC
@@ -334,37 +356,35 @@ class BcViewSet(viewsets.GenericViewSet):
 
             if search:
                 for word in search.split():
-                    queryset = queryset.filter(
-                        Q(cmf_code__icontains=search)
-                    )
-            queryset = queryset.order_by('cmf_code')
+                    queryset = queryset.filter(Q(cmf_code__icontains=search))
+            queryset = queryset.order_by("cmf_code")
             page = self.paginate_queryset(queryset)
 
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
-                return Response({
-                    "status": True,
-                    "message": "ok",
-                    "count": self.paginator.page.paginator.count,
-                    "total_pages": self.paginator.page.paginator.num_pages,
-                    "current_page": self.paginator.page.number,
-                    "next": self.paginator.get_next_link(),
-                    "previous": self.paginator.get_previous_link(),
-                    "bc_list": serializer.data,
-                })
+                return Response(
+                    {
+                        "status": True,
+                        "message": "ok",
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "bc_list": serializer.data,
+                    }
+                )
 
             serializer = self.get_serializer(queryset, many=True)
-            return Response({
-                "status": True,
-                "message": "ok",
-                "bc_list": serializer.data,
-            })
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "bc_list": serializer.data,
+                }
+            )
         except Exception as e:
-            return Response({
-                "status": False,
-                "message": str(e),
-                "bc_list": []
-            })
+            return Response({"status": False, "message": str(e), "bc_list": []})
 
 
 # liste BC
@@ -391,36 +411,36 @@ class FournisseurViewSet(viewsets.GenericViewSet):
             if search:
                 for word in search.split():
                     queryset = queryset.filter(
-                        Q(cmf_code__icontains=search)
+                        Q(fou_code__icontains=search) | Q(fou_nom__icontains=search)
                     )
-            queryset = queryset.order_by('fou_code')
+            queryset = queryset.order_by("fou_code")
             page = self.paginate_queryset(queryset)
 
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
-                return Response({
-                    "status": True,
-                    "message": "ok",
-                    "count": self.paginator.page.paginator.count,
-                    "total_pages": self.paginator.page.paginator.num_pages,
-                    "current_page": self.paginator.page.number,
-                    "next": self.paginator.get_next_link(),
-                    "previous": self.paginator.get_previous_link(),
-                    "fournisseur": serializer.data,
-                })
+                return Response(
+                    {
+                        "status": True,
+                        "message": "ok",
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "fournisseur": serializer.data,
+                    }
+                )
 
             serializer = self.get_serializer(queryset, many=True)
-            return Response({
-                "status": True,
-                "message": "ok",
-                "fournisseur": serializer.data,
-            })
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "fournisseur": serializer.data,
+                }
+            )
         except Exception as e:
-            return Response({
-                "status": False,
-                "message": str(e),
-                "fournisseur": []
-            })
+            return Response({"status": False, "message": str(e), "fournisseur": []})
 
 
 class FamilleViewSet(viewsets.GenericViewSet):
@@ -433,17 +453,15 @@ class FamilleViewSet(viewsets.GenericViewSet):
         try:
             queryset = self.get_queryset()
             serializer = self.get_serializer(queryset, many=True)
-            return Response({
-                "status": True,
-                "message": "ok",
-                "famille": serializer.data,
-            })
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "famille": serializer.data,
+                }
+            )
         except Exception as e:
-            return Response({
-                "status": False,
-                "message": str(e),
-                "famille": []
-            })
+            return Response({"status": False, "message": str(e), "famille": []})
 
 
 class SousFamilleViewSet(viewsets.GenericViewSet):
@@ -459,42 +477,32 @@ class SousFamilleViewSet(viewsets.GenericViewSet):
 
             if search:
                 for word in search.split():
-                    queryset = queryset.filter(
-                        Q(sof_fam_id__icontains=search)
-                    )
-            queryset = queryset.order_by('sof_nom')
+                    queryset = queryset.filter(Q(sof_fam_id__icontains=search))
+            queryset = queryset.order_by("sof_nom")
             serializer = self.get_serializer(queryset, many=True)
-            return Response({
-                "status": True,
-                "message": "ok",
-                "sous_famille": serializer.data,
-            })
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "sous_famille": serializer.data,
+                }
+            )
         except Exception as e:
-            return Response({
-                "status": False,
-                "message": str(e),
-                "sous_famille": []
-            })
+            return Response({"status": False, "message": str(e), "sous_famille": []})
 
 
 # logOut
 class LogoutView(APIView):
     def post(self, request):
         try:
-            response = Response({
-                "status": True,
-                "message": "Deconexion reussie"
-                })
+            response = Response({"status": True, "message": "Deconexion reussie"})
 
-            response.delete_cookie('access_token')
-            response.delete_cookie('refresh_token')
+            response.delete_cookie("access_token")
+            response.delete_cookie("refresh_token")
 
             return response
         except Exception as e:
-            return response({
-                "status": False,
-                "message": e
-            })
+            return response({"status": False, "message": e})
 
 
 # get last client code
@@ -506,31 +514,18 @@ def generate_reference_view(request):
     print(table_name, pk_field)
     if not table_name or not pk_field:
         return Response(
-            {
-                "error": "Les parametres 'table_name'"
-                "et 'pk_field' sont obligé"
-            },
-            status=status.HTTP_400_BAD_REQUEST
+            {"error": "Les parametres 'table_name'et 'pk_field' sont obligé"},
+            status=status.HTTP_400_BAD_REQUEST,
         )
     try:
         reference = generate_reference(table_name, pk_field)
         print(reference)
-        return Response(
-            {
-                "reference": reference
-            },
-            status=status.HTTP_200_OK
-        )
+        return Response({"reference": reference}, status=status.HTTP_200_OK)
     except ValueError as e:
-        return Response(
-            {
-                "error": str(e)
-            },
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 def generate_enumeration(request):
     enu_code = request.GET.get("enu_code")
     if not enu_code:
@@ -539,15 +534,11 @@ def generate_enumeration(request):
                 "success": False,
                 "error": "enu_code ne doit pas etre vide",
             },
-            status=status.HTTP_400_BAD_REQUEST
+            status=status.HTTP_400_BAD_REQUEST,
         )
     result = generate_enumeration_value(enu_code)
     return Response(
-        {
-            "success": True,
-            "nom_enumeration": result
-        },
-        status=status.HTTP_200_OK
+        {"success": True, "nom_enumeration": result}, status=status.HTTP_200_OK
     )
 
 
@@ -560,10 +551,14 @@ def dynamic_create_view(request):
         # get the 3 first word in table
         prefix = ""
         try:
-            if table_name == 't_sous_famille':
-                prefix = 'sof'
-            elif table_name == 't_in_stock':
-                prefix = 'in'
+            if table_name == "t_sous_famille":
+                prefix = "sof"
+            elif table_name == "t_in_stock":
+                prefix = "in"
+            elif table_name == "t_cmd_fournis":
+                prefix = "cmf"
+            elif table_name == "t_ligne_cmd_fournis":
+                prefix = "cmfl"
             else:
                 for i in range(2, 5):
                     prefix += table_name[i]
@@ -572,34 +567,25 @@ def dynamic_create_view(request):
 
         if not table_name or not data or not prefix:
             return Response(
-                {
-                    "status": False,
-                    "error": "table et data sont obligatoires"
-                },
-                status=status.HTTP_400_BAD_REQUEST
+                {"status": False, "error": "table et data sont obligatoires"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        data.update({
-            f"{prefix}_datecre": timezone.now(),
-            f"{prefix}_usercre": request.user.use_login
-        })
+        data.update(
+            {
+                f"{prefix}_datecre": timezone.now(),
+                f"{prefix}_usercre": request.user.use_login,
+            }
+        )
         instance = create_dynamic_instance(table_name, data)
 
         return Response(
-            {
-                "status": True,
-                "message": "Créé avec succès",
-                "id": instance.pk
-            },
-            status=status.HTTP_201_CREATED
+            {"status": True, "message": "Créé avec succès", "id": instance.pk},
+            status=status.HTTP_201_CREATED,
         )
 
     except Exception as e:
         return Response(
-            {
-                "status": False,
-                "error": str(e)
-            },
-            status=status.HTTP_400_BAD_REQUEST
+            {"status": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST
         )
 
 
@@ -613,23 +599,25 @@ class NombreVenteAPIView(APIView):
             nombre_cmd = TCmdFournis.objects.count()
             nombre_frns = TFournis.objects.count()
             nombre_clts = TClient.objects.count()
-            result.update({
-                "nombre_ventes": nombre_ventes,
-                "nombre_cmd": nombre_cmd,
-                "nombre_frns": nombre_frns,
-                "nombre_clts": nombre_clts
-            })
-            return Response({
-                "nombre": result,
-            })
+            result.update(
+                {
+                    "nombre_ventes": nombre_ventes,
+                    "nombre_cmd": nombre_cmd,
+                    "nombre_frns": nombre_frns,
+                    "nombre_clts": nombre_clts,
+                }
+            )
+            return Response(
+                {
+                    "nombre": result,
+                }
+            )
 
         except Exception as e:
-            return Response({
-                "error": str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 def generate_date_code(request):
     table_name = request.GET.get("table_name")
     is_insert = request.GET.get("is_insert")
@@ -645,16 +633,10 @@ def generate_date_code(request):
                 "success": False,
                 "error": "table_name ne doit pas etre vide",
             },
-            status=status.HTTP_400_BAD_REQUEST
+            status=status.HTTP_400_BAD_REQUEST,
         )
     result = generate_code_date(table_name, is_insert)
-    return Response(
-        {
-            "success": True,
-            "code": result
-        },
-        status=status.HTTP_200_OK
-    )
+    return Response({"success": True, "code": result}, status=status.HTTP_200_OK)
 
 
 class ArticleAutoComplete(APIView):
@@ -663,23 +645,28 @@ class ArticleAutoComplete(APIView):
     def get(self, request):
         search = request.GET.get("search", "")
         print(search)
-        articles = (
-            TPrix.objects
-            .filter(pri_art_code__icontains=search)
-            .values(
-                "pri_id",
-                "pri_art_code",
-                "pri_achat"
-            )
+        articles = TPrix.objects.filter(pri_art_code__icontains=search).values(
+            "pri_id", "pri_art_code", "pri_achat"
         )
-        return Response({
-            "status": True,
-            "articles": [
-                {
-                    "id": a["pri_id"],
-                    "code": a["pri_art_code"],
-                    "prix_ht": a["pri_achat"]
-                }
-                for a in articles
-            ]
-        })
+        nom_articles = (
+            TArticle.objects.filter(art_code__icontains=articles[0]["pri_art_code"])
+            .values("art_nom")
+            .first()
+        )
+        article_name = ""
+        if nom_articles:
+            article_name = nom_articles["art_nom"]
+        return Response(
+            {
+                "status": True,
+                "articles": [
+                    {
+                        "id": a["pri_id"],
+                        "code": a["pri_art_code"],
+                        "prix_ht": a["pri_achat"],
+                        "nom_article": article_name,
+                    }
+                    for a in articles
+                ],
+            }
+        )
