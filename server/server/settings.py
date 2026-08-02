@@ -118,11 +118,11 @@ DATABASES = {
         'NAME': 'db_baby',
         'HOST': 'localhost',
         'USER': 'root',
-        'PASSWORD': 'ny-araza789',
+        'PASSWORD': 'root',
         # supprimmer si pas poste 42
-        'OPTIONS': {
-            'unix_socket': '/home/ny-araza/goinfre/mysql/mysql.sock'
-        }
+        # 'OPTIONS': {
+        #     'unix_socket': '/home/ny-araza/goinfre/mysql/mysql.sock'
+        # }
     }
 }
 

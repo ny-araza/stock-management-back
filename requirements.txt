@@ -1,5 +1,6 @@
-django
-django-filter
-django-cors-headers
-djangorestframework
-djangorestframework-simplejwt
+Django==5.2.6
+django-filter==25.1
+django-cors-headers==4.9.0
+djangorestframework==3.16.1
+djangorestframework-simplejwt==5.5.1
+mysqlclient==2.2.7

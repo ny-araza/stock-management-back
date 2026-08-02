@@ -1,11 +1,20 @@
-VENV = env
+VENV = .env
+PYTHON = $(CURDIR)/$(VENV)/bin/python
+PIP = $(CURDIR)/$(VENV)/bin/pip
 
-all:
-	/usr/share/man/mann/source.n.gz $(VENV)/bin/activate.fish.PHONY: all run
+.PHONY: all install run clean
 
 all: run
 
-run:
-	. env/bin/activate && \
-	cd server && \
-	python manage.py runserver
+$(VENV):
+	python3 -m venv $(VENV)
+
+install: $(VENV)
+	$(PYTHON) -m pip install --upgrade pip
+	$(PIP) install -r requirements.txt
+
+run: $(VENV)
+	cd server && $(PYTHON) manage.py runserver
+
+clean:
+	rm -rf $(VENV)

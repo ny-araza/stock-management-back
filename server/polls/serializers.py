@@ -1,5 +1,6 @@
-from .models import TUsers, TArticle, TClient, \
-                TVente, TCmdFournis, TFournis, TFamille, TSousFamille
+from .models import TLigneEntree, TStock, TUsers, TArticle, TClient, \
+                TVente, TCmdFournis, TFournis, TFamille, TSousFamille, \
+                TEntree
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 
@@ -81,4 +82,21 @@ class FamilleSerializers(serializers.ModelSerializer):
 class SousFamilleSerializers(serializers.ModelSerializer):
     class Meta:
         model = TSousFamille
+        fields = "__all__"
+
+
+class StockSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = TStock
+        fields = "__all__"
+
+
+class LigneEntreeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TLigneEntree
+        fields = "__all__"
+
+class EntreeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TEntree
         fields = "__all__"

@@ -27,6 +27,18 @@ router.register(
     basename="sous-familles"
     )
 
+router.register(
+    r'stock',
+    views.StockViewSet,
+    basename="stock"
+    )
+
+router.register(
+    r'entree_stock',
+    views.EntreeViewSet,
+    basename="entree_stock"
+    )
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),

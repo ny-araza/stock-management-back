@@ -16,6 +16,7 @@ from .filters import (
     ArticleFilter,
     BcFilter,
     ClientFilter,
+    EntreeFilter,
     FournisseurFilter,
     VenteFilter,
 )
@@ -23,10 +24,13 @@ from .models import (
     TArticle,
     TClient,
     TCmdFournis,
+    TEntree,
     TFamille,
     TFournis,
+    TLigneEntree,
     TPrix,
     TSousFamille,
+    TStock,
     TUsers,
     TVente,
 )
@@ -35,10 +39,13 @@ from .serializers import (
     ArticlesSerializers,
     BcSerializers,
     ClientsSerializers,
+    EntreeSerializer,
     FamilleSerializers,
     FournisseurSerializers,
+    LigneEntreeSerializer,
     LoginSerializer,
     SousFamilleSerializers,
+    StockSerializers,
     TUsersSerializer,
     VenteSerializers,
 )
@@ -511,7 +518,6 @@ def generate_reference_view(request):
     table_name = request.GET.get("table_name")
     pk_field = request.GET.get("pk_field")
 
-    print(table_name, pk_field)
     if not table_name or not pk_field:
         return Response(
             {"error": "Les parametres 'table_name'et 'pk_field' sont obligé"},
@@ -519,7 +525,6 @@ def generate_reference_view(request):
         )
     try:
         reference = generate_reference(table_name, pk_field)
-        print(reference)
         return Response({"reference": reference}, status=status.HTTP_200_OK)
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
@@ -670,3 +675,104 @@ class ArticleAutoComplete(APIView):
                 ],
             }
         )
+
+
+class StockViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+    queryset = TStock.objects.all()
+    serializer_class = StockSerializers
+    pagination_class = ListPagination
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            search = request.query_params.get("search", "").strip()
+            page = self.paginate_queryset(queryset)
+
+            if page is not None:
+                if search:
+                    for word in search.split():
+                        queryset = queryset.filter(Q(stk_art_code__icontains=search))
+                serializer = self.get_serializer(queryset, many=True)
+                return Response(
+                    {
+                        "status": True,
+                        "message": "ok",
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "stock": serializer.data,
+                    }
+                )
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "stock": serializer.data,
+                }
+            )
+        except Exception as e:
+            return Response({"status": False, "message": str(e), "stock": []})
+
+
+class EntreeViewSet(viewsets.ModelViewSet):
+    queryset = TEntree.objects.all()
+    serializer_class = EntreeSerializer
+    pagination_class = ListPagination
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+
+    filter_backends = [
+        DjangoFilterBackend,
+        OrderingFilter,
+    ]
+
+    filterset_class = EntreeFilter
+
+    def list(self, request, *args, **kwargs):
+        try:
+                queryset = self.filter_queryset(self.get_queryset()).order_by("ent_id")
+                page = self.paginate_queryset(queryset)
+
+                objets = page if page is not None else queryset
+                serializer = self.get_serializer(objets, many=True)
+                data = serializer.data
+
+                # Récupération des lignes pour chaque entrée
+                for entree in data:
+                    lignes = TLigneEntree.objects.filter(
+                        entl_ent_code=entree["ent_code"]
+                    )
+
+                    entree["lignes"] = LigneEntreeSerializer(
+                        lignes,
+                        many=True
+                    ).data
+
+                if page is not None:
+                    return Response({
+                        "status": True,
+                        "message": "ok",
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "entree": data,
+                    })
+
+                return Response({
+                    "status": True,
+                    "message": "ok",
+                    "entree": data,
+                })
+        except Exception as e:
+            return Response({
+                "status": False,
+                "message": str(e),
+                "entree": [],
+            })

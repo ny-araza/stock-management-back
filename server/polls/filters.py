@@ -1,6 +1,6 @@
 from django.db import models
 from django_filters import rest_framework as filters
-from .models import TVente, TClient, TCmdFournis, TFournis, TArticle
+from .models import TEntree, TVente, TClient, TCmdFournis, TFournis, TArticle
 
 
 class ClientFilter(filters.FilterSet):
@@ -229,6 +229,49 @@ class ArticleFilter(filters.FilterSet):
         model = TArticle
         exclude = [
             "art_id",
+        ]
+
+        filter_overrides = {
+            models.CharField: {
+                "filter_class": filters.CharFilter,
+                "extra": lambda f: {
+                    "lookup_expr": "icontains"
+                },
+            },
+
+            models.DecimalField: {
+                "filter_class": filters.NumberFilter,
+            },
+
+            models.DateField: {
+                "filter_class": filters.DateFilter,
+            },
+
+            models.DateTimeField: {
+                "filter_class": filters.DateFilter,
+                "extra": lambda f: {
+                    "lookup_expr": "date"
+                },
+            },
+        }
+
+class EntreeFilter(filters.FilterSet):
+
+    ent_enabled = filters.NumberFilter()
+    ent_datecre_year = filters.NumberFilter(
+        field_name="ent_datecre", lookup_expr="year")
+    ent_datecre_month = filters.NumberFilter(
+        field_name="ent_datecre", lookup_expr="month")
+
+    ent_datemdf_year = filters.NumberFilter(
+        field_name="ent_datemdf", lookup_expr="year")
+    ent_datemdf_month = filters.NumberFilter(
+        field_name="ent_datemdf", lookup_expr="month")
+
+    class Meta:
+        model = TEntree
+        exclude = [
+            "ent_id",
         ]
 
         filter_overrides = {
