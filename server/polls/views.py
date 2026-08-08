@@ -560,10 +560,14 @@ def dynamic_create_view(request):
                 prefix = "sof"
             elif table_name == "t_in_stock":
                 prefix = "in"
+            elif table_name == "t_out_stock":
+                prefix = "out"
             elif table_name == "t_cmd_fournis":
                 prefix = "cmf"
             elif table_name == "t_ligne_cmd_fournis":
                 prefix = "cmfl"
+            elif table_name == "t_ligne_entree":
+                prefix = "entl"
             else:
                 for i in range(2, 5):
                     prefix += table_name[i]
