@@ -18,6 +18,8 @@ from .filters import (
     ClientFilter,
     EntreeFilter,
     FournisseurFilter,
+    InStockFilter,
+    SortitFilter,
     VenteFilter,
 )
 from .models import (
@@ -27,7 +29,10 @@ from .models import (
     TEntree,
     TFamille,
     TFournis,
+    TInStock,
     TLigneEntree,
+    TLot,
+    TOutStock,
     TPrix,
     TSousFamille,
     TStock,
@@ -42,8 +47,12 @@ from .serializers import (
     EntreeSerializer,
     FamilleSerializers,
     FournisseurSerializers,
+    InStockSerializer,
     LigneEntreeSerializer,
     LoginSerializer,
+    LotSerializer,
+    PrixSerializer,
+    SortitSerializer,
     SousFamilleSerializers,
     StockSerializers,
     TUsersSerializer,
@@ -780,3 +789,121 @@ class EntreeViewSet(viewsets.ModelViewSet):
                 "message": str(e),
                 "entree": [],
             })
+
+
+class SortitViewSet(viewsets.ModelViewSet):
+    queryset = TOutStock.objects.all()
+    serializer_class = SortitSerializer
+    pagination_class = ListPagination
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+
+    filter_backends = [
+        DjangoFilterBackend,
+        OrderingFilter,
+    ]
+
+    filterset_class = SortitFilter
+
+    def list(self, request, *args, **kwargs):
+        try:
+                queryset = self.filter_queryset(self.get_queryset()).order_by("out_id")
+                page = self.paginate_queryset(queryset)
+
+                objets = page if page is not None else queryset
+                serializer = self.get_serializer(objets, many=True)
+                data = serializer.data
+
+                for sortie in data:
+                    lignes = TLot.objects.filter(
+                        lot_id=sortie["out_lot_id"]
+                    )
+
+                    sortie["lot"] = LotSerializer(
+                        lignes,
+                        many=True
+                    ).data
+
+                if page is not None:
+                    return Response({
+                        "status": True,
+                        "message": "ok",
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "sortie": data,
+                    })
+
+                return Response({
+                    "status": True,
+                    "message": "ok",
+                    "sortie": data,
+                })
+        except Exception as e:
+            return Response({
+                "status": False,
+                "message": str(e),
+                "sortie": [],
+            })
+
+
+class InStockViewSet(viewsets.ModelViewSet):
+    queryset = TInStock.objects.all()
+    serializer_class = InStockSerializer
+    pagination_class = ListPagination
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+
+    filter_backends = [
+        DjangoFilterBackend,
+        OrderingFilter,
+    ]
+
+    filterset_class = InStockFilter
+
+    def list(self, request, *args, **kwargs):
+        try:
+                queryset = self.filter_queryset(self.get_queryset()).order_by("in_id")
+                page = self.paginate_queryset(queryset)
+
+                objets = page if page is not None else queryset
+                serializer = self.get_serializer(objets, many=True)
+                data = serializer.data
+
+                for sortie in data:
+                    lignes = TLot.objects.filter(
+                        lot_id=sortie["in_lot_id"]
+                    )
+
+                    sortie["lot"] = LotSerializer(
+                        lignes,
+                        many=True
+                    ).data
+
+                if page is not None:
+                    return Response({
+                        "status": True,
+                        "message": "ok",
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "entree": data,
+                    })
+
+                return Response({
+                    "status": True,
+                    "message": "ok",
+                    "entree": data,
+                })
+        except Exception as e:
+            return Response({
+                "status": False,
+                "message": str(e),
+                "entree": [],
+            })
+
+

@@ -1,4 +1,4 @@
-from .models import TLigneEntree, TStock, TUsers, TArticle, TClient, \
+from .models import TInStock, TLigneEntree, TLot, TOutStock, TPrix, TStock, TUsers, TArticle, TClient, \
                 TVente, TCmdFournis, TFournis, TFamille, TSousFamille, \
                 TEntree
 from rest_framework import serializers
@@ -99,4 +99,24 @@ class LigneEntreeSerializer(serializers.ModelSerializer):
 class EntreeSerializer(serializers.ModelSerializer):
     class Meta:
         model = TEntree
+        fields = "__all__"
+
+class SortitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TOutStock
+        fields = "__all__"
+
+class LotSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TLot
+        fields = "__all__"
+
+class PrixSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TPrix
+        fields = "__all__"
+
+class InStockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TInStock
         fields = "__all__"

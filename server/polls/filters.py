@@ -1,6 +1,6 @@
 from django.db import models
 from django_filters import rest_framework as filters
-from .models import TEntree, TVente, TClient, TCmdFournis, TFournis, TArticle
+from .models import TEntree, TInStock, TOutStock, TVente, TClient, TCmdFournis, TFournis, TArticle
 
 
 class ClientFilter(filters.FilterSet):
@@ -297,3 +297,92 @@ class EntreeFilter(filters.FilterSet):
                 },
             },
         }
+
+
+class SortitFilter(filters.FilterSet):
+
+    out_enabled = filters.NumberFilter()
+    out_datecre_year = filters.NumberFilter(
+        field_name="out_datecre", lookup_expr="year")
+    out_datecre_month = filters.NumberFilter(
+        field_name="out_datecre", lookup_expr="month")
+
+    out_datemdf_year = filters.NumberFilter(
+        field_name="out_datemdf", lookup_expr="year")
+    out_datemdf_month = filters.NumberFilter(
+        field_name="out_datemdf", lookup_expr="month")
+
+    class Meta:
+        model = TOutStock
+        exclude = [
+            "out_id",
+        ]
+
+        filter_overrides = {
+            models.CharField: {
+                "filter_class": filters.CharFilter,
+                "extra": lambda f: {
+                    "lookup_expr": "icontains"
+                },
+            },
+
+            models.DecimalField: {
+                "filter_class": filters.NumberFilter,
+            },
+
+            models.DateField: {
+                "filter_class": filters.DateFilter,
+            },
+
+            models.DateTimeField: {
+                "filter_class": filters.DateFilter,
+                "extra": lambda f: {
+                    "lookup_expr": "date"
+                },
+            },
+        }
+
+
+class InStockFilter(filters.FilterSet):
+
+    int_enabled = filters.NumberFilter()
+    int_datecre_year = filters.NumberFilter(
+        field_name="int_datecre", lookup_expr="year")
+    int_datecre_month = filters.NumberFilter(
+        field_name="int_datecre", lookup_expr="month")
+
+    int_datemdf_year = filters.NumberFilter(
+        field_name="int_datemdf", lookup_expr="year")
+    int_datemdf_month = filters.NumberFilter(
+        field_name="int_datemdf", lookup_expr="month")
+
+    class Meta:
+        model = TInStock
+        exclude = [
+            "in_id",
+        ]
+
+        filter_overrides = {
+            models.CharField: {
+                "filter_class": filters.CharFilter,
+                "extra": lambda f: {
+                    "lookup_expr": "icontains"
+                },
+            },
+
+            models.DecimalField: {
+                "filter_class": filters.NumberFilter,
+            },
+
+            models.DateField: {
+                "filter_class": filters.DateFilter,
+            },
+
+            models.DateTimeField: {
+                "filter_class": filters.DateFilter,
+                "extra": lambda f: {
+                    "lookup_expr": "date"
+                },
+            },
+        }
+

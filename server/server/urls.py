@@ -39,6 +39,17 @@ router.register(
     basename="entree_stock"
     )
 
+router.register(
+    r'sortit_stock',
+    views.SortitViewSet,
+    basename="sortit_stock"
+    )
+
+router.register(
+    r'in_stock',
+    views.InStockViewSet,
+    basename="in_stock"
+    )
 
 urlpatterns = [
     path('admin/', admin.site.urls),
