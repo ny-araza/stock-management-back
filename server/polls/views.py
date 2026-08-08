@@ -19,6 +19,8 @@ from .filters import (
     EntreeFilter,
     FournisseurFilter,
     InStockFilter,
+    MvtStockFilter,
+    MvtStockFilterr,
     SortitFilter,
     VenteFilter,
 )
@@ -32,6 +34,7 @@ from .models import (
     TInStock,
     TLigneEntree,
     TLot,
+    TMvtStock,
     TOutStock,
     TPrix,
     TSousFamille,
@@ -51,6 +54,7 @@ from .serializers import (
     LigneEntreeSerializer,
     LoginSerializer,
     LotSerializer,
+    MvtStockSerializer,
     PrixSerializer,
     SortitSerializer,
     SousFamilleSerializers,
@@ -748,26 +752,22 @@ class EntreeViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-                queryset = self.filter_queryset(self.get_queryset()).order_by("ent_id")
-                page = self.paginate_queryset(queryset)
+            queryset = self.filter_queryset(self.get_queryset()).order_by("ent_id")
+            page = self.paginate_queryset(queryset)
 
-                objets = page if page is not None else queryset
-                serializer = self.get_serializer(objets, many=True)
-                data = serializer.data
+            objets = page if page is not None else queryset
+            serializer = self.get_serializer(objets, many=True)
+            data = serializer.data
 
-                # Récupération des lignes pour chaque entrée
-                for entree in data:
-                    lignes = TLigneEntree.objects.filter(
-                        entl_ent_code=entree["ent_code"]
-                    )
+            # Récupération des lignes pour chaque entrée
+            for entree in data:
+                lignes = TLigneEntree.objects.filter(entl_ent_code=entree["ent_code"])
 
-                    entree["lignes"] = LigneEntreeSerializer(
-                        lignes,
-                        many=True
-                    ).data
+                entree["lignes"] = LigneEntreeSerializer(lignes, many=True).data
 
-                if page is not None:
-                    return Response({
+            if page is not None:
+                return Response(
+                    {
                         "status": True,
                         "message": "ok",
                         "count": self.paginator.page.paginator.count,
@@ -776,19 +776,24 @@ class EntreeViewSet(viewsets.ModelViewSet):
                         "next": self.paginator.get_next_link(),
                         "previous": self.paginator.get_previous_link(),
                         "entree": data,
-                    })
+                    }
+                )
 
-                return Response({
+            return Response(
+                {
                     "status": True,
                     "message": "ok",
                     "entree": data,
-                })
+                }
+            )
         except Exception as e:
-            return Response({
-                "status": False,
-                "message": str(e),
-                "entree": [],
-            })
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "entree": [],
+                }
+            )
 
 
 class SortitViewSet(viewsets.ModelViewSet):
@@ -807,25 +812,21 @@ class SortitViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-                queryset = self.filter_queryset(self.get_queryset()).order_by("out_id")
-                page = self.paginate_queryset(queryset)
+            queryset = self.filter_queryset(self.get_queryset()).order_by("out_id")
+            page = self.paginate_queryset(queryset)
 
-                objets = page if page is not None else queryset
-                serializer = self.get_serializer(objets, many=True)
-                data = serializer.data
+            objets = page if page is not None else queryset
+            serializer = self.get_serializer(objets, many=True)
+            data = serializer.data
 
-                for sortie in data:
-                    lignes = TLot.objects.filter(
-                        lot_id=sortie["out_lot_id"]
-                    )
+            for sortie in data:
+                lignes = TLot.objects.filter(lot_id=sortie["out_lot_id"])
 
-                    sortie["lot"] = LotSerializer(
-                        lignes,
-                        many=True
-                    ).data
+                sortie["lot"] = LotSerializer(lignes, many=True).data
 
-                if page is not None:
-                    return Response({
+            if page is not None:
+                return Response(
+                    {
                         "status": True,
                         "message": "ok",
                         "count": self.paginator.page.paginator.count,
@@ -834,19 +835,24 @@ class SortitViewSet(viewsets.ModelViewSet):
                         "next": self.paginator.get_next_link(),
                         "previous": self.paginator.get_previous_link(),
                         "sortie": data,
-                    })
+                    }
+                )
 
-                return Response({
+            return Response(
+                {
                     "status": True,
                     "message": "ok",
                     "sortie": data,
-                })
+                }
+            )
         except Exception as e:
-            return Response({
-                "status": False,
-                "message": str(e),
-                "sortie": [],
-            })
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "sortie": [],
+                }
+            )
 
 
 class InStockViewSet(viewsets.ModelViewSet):
@@ -865,25 +871,21 @@ class InStockViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-                queryset = self.filter_queryset(self.get_queryset()).order_by("in_id")
-                page = self.paginate_queryset(queryset)
+            queryset = self.filter_queryset(self.get_queryset()).order_by("in_id")
+            page = self.paginate_queryset(queryset)
 
-                objets = page if page is not None else queryset
-                serializer = self.get_serializer(objets, many=True)
-                data = serializer.data
+            objets = page if page is not None else queryset
+            serializer = self.get_serializer(objets, many=True)
+            data = serializer.data
 
-                for sortie in data:
-                    lignes = TLot.objects.filter(
-                        lot_id=sortie["in_lot_id"]
-                    )
+            for sortie in data:
+                lignes = TLot.objects.filter(lot_id=sortie["in_lot_id"])
 
-                    sortie["lot"] = LotSerializer(
-                        lignes,
-                        many=True
-                    ).data
+                sortie["lot"] = LotSerializer(lignes, many=True).data
 
-                if page is not None:
-                    return Response({
+            if page is not None:
+                return Response(
+                    {
                         "status": True,
                         "message": "ok",
                         "count": self.paginator.page.paginator.count,
@@ -892,18 +894,104 @@ class InStockViewSet(viewsets.ModelViewSet):
                         "next": self.paginator.get_next_link(),
                         "previous": self.paginator.get_previous_link(),
                         "entree": data,
-                    })
+                    }
+                )
 
-                return Response({
+            return Response(
+                {
                     "status": True,
                     "message": "ok",
                     "entree": data,
-                })
+                }
+            )
         except Exception as e:
-            return Response({
-                "status": False,
-                "message": str(e),
-                "entree": [],
-            })
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "entree": [],
+                }
+            )
 
 
+class MvtStockViewSet(viewsets.ModelViewSet):
+    queryset = TMvtStock.objects.all()
+    serializer_class = MvtStockSerializer
+    pagination_class = ListPagination
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+
+    filter_backends = [
+        DjangoFilterBackend,
+        OrderingFilter,
+    ]
+
+    filterset_class = MvtStockFilter
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.filter_queryset(self.get_queryset()).order_by("mvt_id")
+            page = self.paginate_queryset(queryset)
+
+            objets = page if page is not None else queryset
+            serializer = self.get_serializer(objets, many=True)
+            data = serializer.data
+
+            if page is not None:
+                return Response(
+                    {
+                        "status": True,
+                        "message": "ok",
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "mvt": data,
+                    }
+                )
+
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "mvt": data,
+                }
+            )
+        except Exception as e:
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "mvt": [],
+                }
+            )
+
+
+class MvtStockViewSett(viewsets.ModelViewSet):
+    queryset = TMvtStock.objects.all().order_by("-mvt_id")
+
+    serializer_class = MvtStockSerializer
+
+    pagination_class = ListPagination
+
+    permission_classes = [IsAuthenticated]
+
+    authentication_classes = [CookieJWTAuthentification]
+
+    filter_backends = [
+        DjangoFilterBackend,
+        OrderingFilter,
+    ]
+
+    filterset_class = MvtStockFilterr
+
+    ordering_fields = [
+        "mvt_id",
+        "mvt_qte",
+        "mvt_date",
+        "mvt_datecre",
+        "mvt_datemdf",
+    ]
+
+    ordering = ["-mvt_id"]

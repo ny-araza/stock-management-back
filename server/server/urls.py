@@ -51,6 +51,18 @@ router.register(
     basename="in_stock"
     )
 
+router.register(
+    r'mvt_stock',
+    views.MvtStockViewSet,
+    basename="mvt_stock"
+    )
+
+router.register(
+    r"mvt_stockkk",
+    views.MvtStockViewSett,
+    basename="mvt-stock"
+)
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),

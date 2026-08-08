@@ -1,4 +1,4 @@
-from .models import TInStock, TLigneEntree, TLot, TOutStock, TPrix, TStock, TUsers, TArticle, TClient, \
+from .models import TInStock, TLigneEntree, TLot, TMvtStock, TOutStock, TPrix, TStock, TUsers, TArticle, TClient, \
                 TVente, TCmdFournis, TFournis, TFamille, TSousFamille, \
                 TEntree
 from rest_framework import serializers
@@ -120,3 +120,10 @@ class InStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = TInStock
         fields = "__all__"
+
+
+class MvtStockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TMvtStock
+        fields = "__all__"
+
