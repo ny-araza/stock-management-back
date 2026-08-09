@@ -671,10 +671,10 @@ class ArticleAutoComplete(APIView):
             articles = TPrix.objects.filter(pri_art_code__icontains=search).values(
                 "pri_id", "pri_art_code", "pri_achat"
             )
-    
+
             if not articles:
                 raise Exception("Pas d'article code correspondant")
-    
+
             nom_articles = (
                 TArticle.objects.filter(art_code__icontains=articles[0]["pri_art_code"])
                 .values("art_nom")
@@ -698,13 +698,7 @@ class ArticleAutoComplete(APIView):
                 }
             )
         except Exception as e:
-            return Response(
-                {
-                    "status": False,
-                    "message": str(e),
-                    "articles": []
-                }
-            )
+            return Response({"status": False, "message": str(e), "articles": []})
 
 
 class StockViewSet(viewsets.GenericViewSet):
@@ -718,13 +712,27 @@ class StockViewSet(viewsets.GenericViewSet):
         try:
             queryset = self.filter_queryset(self.get_queryset())
             search = request.query_params.get("search", "").strip()
+
+            if search:
+                for word in search.split():
+                    queryset = queryset.filter(Q(stk_art_code__icontains=word))
+
             page = self.paginate_queryset(queryset)
 
             if page is not None:
-                if search:
-                    for word in search.split():
-                        queryset = queryset.filter(Q(stk_art_code__icontains=search))
-                serializer = self.get_serializer(queryset, many=True)
+                serializer = self.get_serializer(page, many=True)
+
+                data = serializer.data
+
+                for stock in data:
+                    article = TArticle.objects.filter(
+                        art_code=stock["stk_art_code"]
+                    ).first()
+
+                    stock["article_table"] = (
+                        ArticlesSerializers(article).data if article else None
+                    )
+
                 return Response(
                     {
                         "status": True,
@@ -734,19 +742,37 @@ class StockViewSet(viewsets.GenericViewSet):
                         "current_page": self.paginator.page.number,
                         "next": self.paginator.get_next_link(),
                         "previous": self.paginator.get_previous_link(),
-                        "stock": serializer.data,
+                        "stock": data,
                     }
                 )
+
             serializer = self.get_serializer(queryset, many=True)
+
+            data = serializer.data
+
+            for stock in data:
+                article = TArticle.objects.filter(
+                    art_code=stock["stk_art_code"]
+                ).first()
+
+                stock["article"] = ArticlesSerializers(article).data if article else None
+
             return Response(
                 {
                     "status": True,
                     "message": "ok",
-                    "stock": serializer.data,
+                    "stock": data,
                 }
             )
+
         except Exception as e:
-            return Response({"status": False, "message": str(e), "stock": []})
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "stock": [],
+                }
+            )
 
 
 class EntreeViewSet(viewsets.ModelViewSet):
