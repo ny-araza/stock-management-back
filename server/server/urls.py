@@ -60,7 +60,7 @@ router.register(
 router.register(
     r"mvt_stockkk",
     views.MvtStockViewSett,
-    basename="mvt-stock"
+    basename="mvt-stockk"
 )
 
 urlpatterns = [

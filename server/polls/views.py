@@ -665,33 +665,46 @@ class ArticleAutoComplete(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        search = request.GET.get("search", "")
-        print(search)
-        articles = TPrix.objects.filter(pri_art_code__icontains=search).values(
-            "pri_id", "pri_art_code", "pri_achat"
-        )
-        nom_articles = (
-            TArticle.objects.filter(art_code__icontains=articles[0]["pri_art_code"])
-            .values("art_nom")
-            .first()
-        )
-        article_name = ""
-        if nom_articles:
-            article_name = nom_articles["art_nom"]
-        return Response(
-            {
-                "status": True,
-                "articles": [
-                    {
-                        "id": a["pri_id"],
-                        "code": a["pri_art_code"],
-                        "prix_ht": a["pri_achat"],
-                        "nom_article": article_name,
-                    }
-                    for a in articles
-                ],
-            }
-        )
+        try:
+            search = request.GET.get("search", "")
+            print(search)
+            articles = TPrix.objects.filter(pri_art_code__icontains=search).values(
+                "pri_id", "pri_art_code", "pri_achat"
+            )
+    
+            if not articles:
+                raise Exception("Pas d'article code correspondant")
+    
+            nom_articles = (
+                TArticle.objects.filter(art_code__icontains=articles[0]["pri_art_code"])
+                .values("art_nom")
+                .first()
+            )
+            article_name = ""
+            if nom_articles:
+                article_name = nom_articles["art_nom"]
+            return Response(
+                {
+                    "status": True,
+                    "articles": [
+                        {
+                            "id": a["pri_id"],
+                            "code": a["pri_art_code"],
+                            "prix_ht": a["pri_achat"],
+                            "nom_article": article_name,
+                        }
+                        for a in articles
+                    ],
+                }
+            )
+        except Exception as e:
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "articles": []
+                }
+            )
 
 
 class StockViewSet(viewsets.GenericViewSet):
