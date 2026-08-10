@@ -33,6 +33,7 @@ from .models import (
     TFournis,
     TInStock,
     TLigneEntree,
+    TLigneVente,
     TLot,
     TMvtStock,
     TOutStock,
@@ -52,6 +53,7 @@ from .serializers import (
     FournisseurSerializers,
     InStockSerializer,
     LigneEntreeSerializer,
+    LigneVenteSerializer,
     LoginSerializer,
     LotSerializer,
     MvtStockSerializer,
@@ -313,21 +315,19 @@ class VenteViewSet(viewsets.GenericViewSet):
         try:
             # queryset = self.get_queryset()
             queryset = self.filter_queryset(self.get_queryset())
-            search = request.query_params.get("search", "").strip()
-
-            if search:
-                for word in search.split():
-                    queryset = queryset.filter(
-                        Q(vte_code__icontains=search)
-                        | Q(vte_cli_nom__icontains=search)
-                        | Q(vte_payeclient__icontains=search)
-                        | Q(vet_operateur__icontains=search)
-                    )
-            queryset = queryset.order_by("vte_code")
             page = self.paginate_queryset(queryset)
 
+            objets = page if page is not None else queryset
+            serializer = self.get_serializer(objets, many=True)
+            data = serializer.data
+
+            # Récupération des lignes pour chaque entrée
+            for vente in data:
+                lignes = TLigneVente.objects.filter(vtel_vte_code=vente["vte_code"])
+
+                vente["lignes"] = LigneVenteSerializer(lignes, many=True).data
+
             if page is not None:
-                serializer = self.get_serializer(page, many=True)
                 return Response(
                     {
                         "status": True,
@@ -337,20 +337,18 @@ class VenteViewSet(viewsets.GenericViewSet):
                         "current_page": self.paginator.page.number,
                         "next": self.paginator.get_next_link(),
                         "previous": self.paginator.get_previous_link(),
-                        "ventes": serializer.data,
+                        "ventes": data,
                     }
                 )
-
-            serializer = self.get_serializer(queryset, many=True)
             return Response(
                 {
                     "status": True,
                     "message": "ok",
-                    "ventes": serializer.data,
+                    "ventes": data,
                 }
             )
         except Exception as e:
-            return Response({"status": False, "message": e, "ventes": []})
+            return Response({"status": False, "message": str(e), "ventes": []})
 
 
 # liste BC
