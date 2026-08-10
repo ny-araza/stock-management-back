@@ -1,10 +1,10 @@
 # from django.shortcuts import render
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
-from rest_framework.decorators import api_view
+from rest_framework.decorators import action, api_view
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -581,6 +581,8 @@ def dynamic_create_view(request):
                 prefix = "cmfl"
             elif table_name == "t_ligne_entree":
                 prefix = "entl"
+            elif table_name == "t_stock":
+                prefix = "stk"
             else:
                 for i in range(2, 5):
                     prefix += table_name[i]
@@ -708,15 +710,66 @@ class StockViewSet(viewsets.GenericViewSet):
     serializer_class = StockSerializers
     pagination_class = ListPagination
 
+    @action(detail=False, methods=["get"], url_path="article/(?P<art_code>[^/.]+)")
+    def stock_article(self, request, art_code=None):
+        try:
+            stock = (
+                TStock.objects.filter(stk_art_code=art_code).order_by("-stk_id").first()
+            )
+
+            if not stock:
+                return Response(
+                    {
+                        "status": False,
+                        "message": f"Aucun stock trouvé pour l'article {art_code}.",
+                        "stock": None,
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            serializer = self.get_serializer(stock)
+
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "stock": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "stock": None,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     def list(self, request, *args, **kwargs):
         try:
             queryset = self.filter_queryset(self.get_queryset())
+
             search = request.query_params.get("search", "").strip()
 
+            # Recherche
             if search:
                 for word in search.split():
                     queryset = queryset.filter(Q(stk_art_code__icontains=word))
 
+            # Récupérer le dernier stk_id pour chaque article
+            derniere_ligne = (
+                TStock.objects.filter(stk_art_code=OuterRef("stk_art_code"))
+                .order_by("-stk_id")
+                .values("stk_id")[:1]
+            )
+
+            # Garder uniquement la dernière ligne de chaque stk_art_code
+            queryset = queryset.filter(stk_id=Subquery(derniere_ligne))
+
+            # Pagination
             page = self.paginate_queryset(queryset)
 
             if page is not None:
@@ -755,7 +808,9 @@ class StockViewSet(viewsets.GenericViewSet):
                     art_code=stock["stk_art_code"]
                 ).first()
 
-                stock["article"] = ArticlesSerializers(article).data if article else None
+                stock["article_table"] = (
+                    ArticlesSerializers(article).data if article else None
+                )
 
             return Response(
                 {
