@@ -63,6 +63,18 @@ router.register(
     basename="mvt-stockk"
 )
 
+router.register(
+    r"retours_fournisseur",
+    views.RtfViewSet,
+    basename="retours_fournisseur"
+)
+
+router.register(
+    r"retours_client",
+    views.RtcViewSet,
+    basename="retours_client"
+)
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),

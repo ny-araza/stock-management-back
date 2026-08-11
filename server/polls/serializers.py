@@ -1,4 +1,4 @@
-from .models import TInStock, TLigneEntree, TLigneVente, TLot, TMvtStock, TOutStock, TPrix, TStock, TUsers, TArticle, TClient, \
+from .models import TInStock, TLigneEntree, TLigneRtc, TLigneRtf, TLigneVente, TLot, TMvtStock, TOutStock, TPrix, TRetourClient, TRetourFournis, TStock, TUsers, TArticle, TClient, \
                 TVente, TCmdFournis, TFournis, TFamille, TSousFamille, \
                 TEntree
 from rest_framework import serializers
@@ -96,6 +96,17 @@ class LigneEntreeSerializer(serializers.ModelSerializer):
         model = TLigneEntree
         fields = "__all__"
 
+class LigneRtfSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TLigneRtf
+        fields = "__all__"
+
+class LigneRtcSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TLigneRtc
+        fields = "__all__"
+
+
 class LigneVenteSerializer(serializers.ModelSerializer):
     class Meta:
         model = TLigneVente
@@ -133,3 +144,14 @@ class MvtStockSerializer(serializers.ModelSerializer):
         model = TMvtStock
         fields = "__all__"
 
+
+class RtfSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TRetourFournis
+        fields = "__all__"
+
+
+class RtcSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TRetourClient
+        fields = "__all__"

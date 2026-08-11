@@ -11,6 +11,8 @@ from .models import (
     TInStock,
     TMvtStock,
     TOutStock,
+    TRetourClient,
+    TRetourFournis,
     TVente,
 )
 
@@ -281,6 +283,84 @@ class EntreeFilter(filters.FilterSet):
             },
         }
 
+
+class RtfFilter(filters.FilterSet):
+    rtf_enabled = filters.NumberFilter()
+    rtf_datecre_year = filters.NumberFilter(
+        field_name="rtf_datecre", lookup_expr="year"
+    )
+    rtf_datecre_month = filters.NumberFilter(
+        field_name="rtf_datecre", lookup_expr="month"
+    )
+
+    rtf_datemdf_year = filters.NumberFilter(
+        field_name="rtf_datemdf", lookup_expr="year"
+    )
+    rtf_datemdf_month = filters.NumberFilter(
+        field_name="rtf_datemdf", lookup_expr="month"
+    )
+
+    class Meta:
+        model = TRetourFournis
+        exclude = [
+            "rtf_id",
+        ]
+
+        filter_overrides = {
+            models.CharField: {
+                "filter_class": filters.CharFilter,
+                "extra": lambda f: {"lookup_expr": "icontains"},
+            },
+            models.DecimalField: {
+                "filter_class": filters.NumberFilter,
+            },
+            models.DateField: {
+                "filter_class": filters.DateFilter,
+            },
+            models.DateTimeField: {
+                "filter_class": filters.DateFilter,
+                "extra": lambda f: {"lookup_expr": "date"},
+            },
+        }
+
+class RtcFilter(filters.FilterSet):
+    rtc_enabled = filters.NumberFilter()
+    rtc_datecre_year = filters.NumberFilter(
+        field_name="rtc_datecre", lookup_expr="year"
+    )
+    rtc_datecre_month = filters.NumberFilter(
+        field_name="rtc_datecre", lookup_expr="month"
+    )
+
+    rtc_datemdf_year = filters.NumberFilter(
+        field_name="rtc_datemdf", lookup_expr="year"
+    )
+    rtc_datemdf_month = filters.NumberFilter(
+        field_name="rtc_datemdf", lookup_expr="month"
+    )
+
+    class Meta:
+        model = TRetourClient
+        exclude = [
+            "rtc_id",
+        ]
+
+        filter_overrides = {
+            models.CharField: {
+                "filter_class": filters.CharFilter,
+                "extra": lambda f: {"lookup_expr": "icontains"},
+            },
+            models.DecimalField: {
+                "filter_class": filters.NumberFilter,
+            },
+            models.DateField: {
+                "filter_class": filters.DateFilter,
+            },
+            models.DateTimeField: {
+                "filter_class": filters.DateFilter,
+                "extra": lambda f: {"lookup_expr": "date"},
+            },
+        }
 
 class SortitFilter(filters.FilterSet):
     out_enabled = filters.NumberFilter()

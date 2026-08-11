@@ -21,6 +21,8 @@ from .filters import (
     InStockFilter,
     MvtStockFilter,
     MvtStockFilterr,
+    RtcFilter,
+    RtfFilter,
     SortitFilter,
     VenteFilter,
 )
@@ -33,11 +35,15 @@ from .models import (
     TFournis,
     TInStock,
     TLigneEntree,
+    TLigneRtc,
+    TLigneRtf,
     TLigneVente,
     TLot,
     TMvtStock,
     TOutStock,
     TPrix,
+    TRetourClient,
+    TRetourFournis,
     TSousFamille,
     TStock,
     TUsers,
@@ -53,11 +59,15 @@ from .serializers import (
     FournisseurSerializers,
     InStockSerializer,
     LigneEntreeSerializer,
+    LigneRtcSerializer,
+    LigneRtfSerializer,
     LigneVenteSerializer,
     LoginSerializer,
     LotSerializer,
     MvtStockSerializer,
     PrixSerializer,
+    RtcSerializer,
+    RtfSerializer,
     SortitSerializer,
     SousFamilleSerializers,
     StockSerializers,
@@ -1091,3 +1101,123 @@ class MvtStockViewSett(viewsets.ModelViewSet):
     ]
 
     ordering = ["-mvt_id"]
+
+
+class RtfViewSet(viewsets.ModelViewSet):
+    queryset = TRetourFournis.objects.all()
+    serializer_class = RtfSerializer
+    pagination_class = ListPagination
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+
+    filter_backends = [
+        DjangoFilterBackend,
+        OrderingFilter,
+    ]
+
+    filterset_class = RtfFilter
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.filter_queryset(self.get_queryset()).order_by("rtf_id")
+            page = self.paginate_queryset(queryset)
+
+            objets = page if page is not None else queryset
+            serializer = self.get_serializer(objets, many=True)
+            data = serializer.data
+
+            # Récupération des lignes pour chaque entrée
+            for entree in data:
+                lignes = TLigneRtf.objects.filter(rtfl_rtf_code=entree["rtf_code"])
+
+                entree["lignes"] = LigneRtfSerializer(lignes, many=True).data
+
+            if page is not None:
+                return Response(
+                    {
+                        "status": True,
+                        "message": "ok",
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "retour_fournisseur": data,
+                    }
+                )
+
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "retour_fournisseur": data,
+                }
+            )
+        except Exception as e:
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "retour_fournisseur": [],
+                }
+            )
+
+
+class RtcViewSet(viewsets.ModelViewSet):
+    queryset = TRetourClient.objects.all()
+    serializer_class = RtcSerializer
+    pagination_class = ListPagination
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentification]
+
+    filter_backends = [
+        DjangoFilterBackend,
+        OrderingFilter,
+    ]
+
+    filterset_class = RtcFilter
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.filter_queryset(self.get_queryset()).order_by("rtc_id")
+            page = self.paginate_queryset(queryset)
+
+            objets = page if page is not None else queryset
+            serializer = self.get_serializer(objets, many=True)
+            data = serializer.data
+
+            # Récupération des lignes pour chaque entrée
+            for entree in data:
+                lignes = TLigneRtc.objects.filter(rtcl_rtc_code=entree["rtc_code"])
+
+                entree["lignes"] = LigneRtcSerializer(lignes, many=True).data
+
+            if page is not None:
+                return Response(
+                    {
+                        "status": True,
+                        "message": "ok",
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "retour_client": data,
+                    }
+                )
+
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "retour_client": data,
+                }
+            )
+        except Exception as e:
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "retour_client": [],
+                }
+            )
