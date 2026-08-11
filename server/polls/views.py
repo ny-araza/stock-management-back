@@ -581,6 +581,10 @@ def dynamic_create_view(request):
                 prefix = "entl"
             elif table_name == "t_stock":
                 prefix = "stk"
+            elif table_name == "t_vente":
+                prefix = "vte"
+            elif table_name == "t_ligne_vente":
+                prefix = "vtel"
             else:
                 for i in range(2, 5):
                     prefix += table_name[i]
