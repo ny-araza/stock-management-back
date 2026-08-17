@@ -595,6 +595,14 @@ def dynamic_create_view(request):
                 prefix = "vte"
             elif table_name == "t_ligne_vente":
                 prefix = "vtel"
+            elif table_name == "t_retour_fournis":
+                prefix = "rtf"
+            elif table_name == "t_ligne_rtf":
+                prefix = "rtfl"
+            elif table_name == "t_retour_client":
+                prefix = "rtc"
+            elif table_name == "t_ligne_rtc":
+                prefix = "rtcl"
             else:
                 for i in range(2, 5):
                     prefix += table_name[i]
@@ -675,28 +683,83 @@ def generate_date_code(request):
     return Response({"success": True, "code": result}, status=status.HTTP_200_OK)
 
 
+# class ArticleAutoComplete(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request):
+#         try:
+#             search = request.GET.get("search", "")
+#             articles = TPrix.objects.filter(pri_art_code__icontains=search).values(
+#                 "pri_id", "pri_art_code", "pri_achat", "pri_vte"
+#             )
+
+#             if not articles:
+#                 raise Exception("Pas d'article code correspondant")
+
+
+#             nom_articles = (
+#                 TArticle.objects.filter(art_code__icontains=articles[0]["pri_art_code"])
+#                 .values("art_nom")
+#                 .first()
+#             )
+#             article_name = ""
+#             if nom_articles:
+#                 article_name = nom_articles["art_nom"]
+#             return Response(
+#                 {
+#                     "status": True,
+#                     "articles": [
+#                         {
+#                             "id": a["pri_id"],
+#                             "code": a["pri_art_code"],
+#                             "prix_ht": a["pri_achat"],
+#                             "prix_vte": a["pri_vte"],
+#                             "nom_article": article_name,
+#                         }
+#                         for a in articles
+#                     ],
+#                 }
+#             )
+#         except Exception as e:
+#             return Response({"status": False, "message": str(e), "articles": []})
 class ArticleAutoComplete(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
-            search = request.GET.get("search", "")
-            print(search)
-            articles = TPrix.objects.filter(pri_art_code__icontains=search).values(
-                "pri_id", "pri_art_code", "pri_achat"
-            )
+            search = request.GET.get("search", "").strip()
+
+            if not search:
+                return Response({"status": True, "articles": []})
+
+            # Recherche des articles par code OU par nom
+            article_codes = TArticle.objects.filter(
+                art_nom__icontains=search
+            ).values_list("art_code", flat=True)
+
+            articles = TPrix.objects.filter(
+                Q(pri_art_code__icontains=search) | Q(pri_art_code__in=article_codes)
+            ).values("pri_id", "pri_art_code", "pri_achat", "pri_vte")
 
             if not articles:
-                raise Exception("Pas d'article code correspondant")
+                return Response(
+                    {
+                        "status": False,
+                        "message": "Pas d'article correspondant",
+                        "articles": [],
+                    }
+                )
 
-            nom_articles = (
-                TArticle.objects.filter(art_code__icontains=articles[0]["pri_art_code"])
-                .values("art_nom")
-                .first()
-            )
-            article_name = ""
-            if nom_articles:
-                article_name = nom_articles["art_nom"]
+            # Récupération des noms correspondant aux codes
+            codes = [a["pri_art_code"] for a in articles]
+
+            noms_articles = {
+                article["art_code"]: article["art_nom"]
+                for article in TArticle.objects.filter(art_code__in=codes).values(
+                    "art_code", "art_nom"
+                )
+            }
+
             return Response(
                 {
                     "status": True,
@@ -705,12 +768,14 @@ class ArticleAutoComplete(APIView):
                             "id": a["pri_id"],
                             "code": a["pri_art_code"],
                             "prix_ht": a["pri_achat"],
-                            "nom_article": article_name,
+                            "prix_vte": a["pri_vte"],
+                            "nom_article": noms_articles.get(a["pri_art_code"], ""),
                         }
                         for a in articles
                     ],
                 }
             )
+
         except Exception as e:
             return Response({"status": False, "message": str(e), "articles": []})
 
