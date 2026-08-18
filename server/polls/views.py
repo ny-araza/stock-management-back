@@ -1,6 +1,6 @@
 # from django.shortcuts import render
 from django.conf import settings
-from django.db.models import OuterRef, Q, Subquery
+from django.db.models import Case, Exists, IntegerField, OuterRef, Q, Subquery, When
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
@@ -34,6 +34,7 @@ from .models import (
     TFamille,
     TFournis,
     TInStock,
+    TLigneCmdFournis,
     TLigneEntree,
     TLigneRtc,
     TLigneRtf,
@@ -683,45 +684,6 @@ def generate_date_code(request):
     return Response({"success": True, "code": result}, status=status.HTTP_200_OK)
 
 
-# class ArticleAutoComplete(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def get(self, request):
-#         try:
-#             search = request.GET.get("search", "")
-#             articles = TPrix.objects.filter(pri_art_code__icontains=search).values(
-#                 "pri_id", "pri_art_code", "pri_achat", "pri_vte"
-#             )
-
-#             if not articles:
-#                 raise Exception("Pas d'article code correspondant")
-
-
-#             nom_articles = (
-#                 TArticle.objects.filter(art_code__icontains=articles[0]["pri_art_code"])
-#                 .values("art_nom")
-#                 .first()
-#             )
-#             article_name = ""
-#             if nom_articles:
-#                 article_name = nom_articles["art_nom"]
-#             return Response(
-#                 {
-#                     "status": True,
-#                     "articles": [
-#                         {
-#                             "id": a["pri_id"],
-#                             "code": a["pri_art_code"],
-#                             "prix_ht": a["pri_achat"],
-#                             "prix_vte": a["pri_vte"],
-#                             "nom_article": article_name,
-#                         }
-#                         for a in articles
-#                     ],
-#                 }
-#             )
-#         except Exception as e:
-#             return Response({"status": False, "message": str(e), "articles": []})
 class ArticleAutoComplete(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -778,6 +740,62 @@ class ArticleAutoComplete(APIView):
 
         except Exception as e:
             return Response({"status": False, "message": str(e), "articles": []})
+
+
+class CFAutoComplete(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            search = request.GET.get("search", "").strip()
+
+            if not search:
+                return Response({"status": True, "cmf_fournis": []})
+
+            # Récupérer les 10 fournisseurs correspondants
+            cmf_fournis = TCmdFournis.objects.filter(
+                cmf_code__icontains=search
+            ).order_by(
+                Case(
+                    When(cmf_code__istartswith=search, then=0),
+                    default=1,
+                    output_field=IntegerField(),
+                ),
+                "cmf_code",
+            )[:10]
+
+            result = []
+
+            for fournisseur in cmf_fournis:
+                # Toutes les lignes correspondant au cmf_code
+                lignes = TLigneCmdFournis.objects.filter(
+                    cmfl_cmf_code=fournisseur.cmf_code
+                )
+
+                # Toutes les colonnes de TCmdFournis
+                fournisseur_data = BcSerializers(fournisseur).data
+
+                # Ajouter les lignes
+                fournisseur_data["ligne"] = [
+                    {
+                        "cmfl_cmf_code": ligne.cmfl_cmf_code,
+                        "cmfl_Quantite": ligne.cmfl_quantite,
+                        "cmfl_PrixAchat": ligne.cmfl_prixachat,
+                        "cmfl_Tva": ligne.cmfl_tva,
+                        "cmfl_TotalHT": ligne.cmfl_totalht,
+                        "cmfl_Art_Code": ligne.cmfl_art_code,
+                        "cmfl_fou_Code": ligne.cmfl_fou_code,
+                        "cmfl_TotalTTC": ligne.cmfl_totalttc,
+                    }
+                    for ligne in lignes
+                ]
+
+                result.append(fournisseur_data)
+
+            return Response({"status": True, "cmf_fournis": result})
+
+        except Exception as e:
+            return Response({"status": False, "message": str(e), "cmf_fournis": []})
 
 
 class StockViewSet(viewsets.GenericViewSet):
