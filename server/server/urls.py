@@ -113,5 +113,10 @@ urlpatterns = [
         "api/cmf-fournis-autocomplete/",
         views.CFAutoComplete.as_view(),
         name="cmf-fournis-autocomplete"
+    ),
+    path(
+        "api/bl-autocomplete/",
+        views.BLAutoComplete.as_view(),
+        name="bl-autocomplete"
     )
 ]

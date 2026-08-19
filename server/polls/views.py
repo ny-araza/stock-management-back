@@ -752,7 +752,7 @@ class CFAutoComplete(APIView):
             if not search:
                 return Response({"status": True, "cmf_fournis": []})
 
-            # Récupérer les 10 fournisseurs correspondants
+            # Récupérer les 30 commandes fournisseurs correspondantes
             cmf_fournis = TCmdFournis.objects.filter(
                 cmf_code__icontains=search
             ).order_by(
@@ -762,33 +762,79 @@ class CFAutoComplete(APIView):
                     output_field=IntegerField(),
                 ),
                 "cmf_code",
-            )[:10]
+            )[:30]
 
             result = []
 
             for fournisseur in cmf_fournis:
-                # Toutes les lignes correspondant au cmf_code
+                # ==========================================
+                # LIGNES DE LA COMMANDE
+                # ==========================================
+
                 lignes = TLigneCmdFournis.objects.filter(
                     cmfl_cmf_code=fournisseur.cmf_code
                 )
 
-                # Toutes les colonnes de TCmdFournis
+                # Récupérer les codes articles
+                art_codes = [
+                    ligne.cmfl_art_code for ligne in lignes if ligne.cmfl_art_code
+                ]
+
+                # Récupérer les articles
+                articles = TArticle.objects.filter(art_code__in=art_codes)
+
+                # Dictionnaire des articles
+                articles_dict = {article.art_code: article for article in articles}
+
+                # ==========================================
+                # INFORMATIONS DU FOURNISSEUR
+                # ==========================================
+
+                fournisseur_obj = TFournis.objects.filter(
+                    fou_code=fournisseur.cmf_fou_code
+                ).first()
+
+                # ==========================================
+                # DONNÉES DE LA COMMANDE
+                # ==========================================
+
                 fournisseur_data = BcSerializers(fournisseur).data
 
-                # Ajouter les lignes
-                fournisseur_data["ligne"] = [
-                    {
-                        "cmfl_cmf_code": ligne.cmfl_cmf_code,
-                        "cmfl_Quantite": ligne.cmfl_quantite,
-                        "cmfl_PrixAchat": ligne.cmfl_prixachat,
-                        "cmfl_Tva": ligne.cmfl_tva,
-                        "cmfl_TotalHT": ligne.cmfl_totalht,
-                        "cmfl_Art_Code": ligne.cmfl_art_code,
-                        "cmfl_fou_Code": ligne.cmfl_fou_code,
-                        "cmfl_TotalTTC": ligne.cmfl_totalttc,
-                    }
-                    for ligne in lignes
-                ]
+                # ==========================================
+                # AJOUTER LE FOURNISSEUR
+                # ==========================================
+
+                fournisseur_data["fournisseur"] = (
+                    FournisseurSerializers(fournisseur_obj).data
+                    if fournisseur_obj
+                    else None
+                )
+
+                # ==========================================
+                # AJOUTER LES LIGNES
+                # ==========================================
+
+                fournisseur_data["ligne"] = []
+
+                for ligne in lignes:
+                    article = articles_dict.get(ligne.cmfl_art_code)
+
+                    fournisseur_data["ligne"].append(
+                        {
+                            "cmfl_cmf_code": ligne.cmfl_cmf_code,
+                            "cmfl_Quantite": ligne.cmfl_quantite,
+                            "cmfl_PrixAchat": ligne.cmfl_prixachat,
+                            "cmfl_Tva": ligne.cmfl_tva,
+                            "cmfl_TotalHT": ligne.cmfl_totalht,
+                            "cmfl_Art_Code": ligne.cmfl_art_code,
+                            "cmfl_fou_Code": ligne.cmfl_fou_code,
+                            "cmfl_TotalTTC": ligne.cmfl_totalttc,
+                            "cmfl_pri_id": ligne.cmfl_id,
+                            "cmfl_dateper": ligne.cmfl_dateper,
+                            # Informations de l'article
+                            "art_nom": (article.art_nom if article else ""),
+                        }
+                    )
 
                 result.append(fournisseur_data)
 
@@ -796,6 +842,108 @@ class CFAutoComplete(APIView):
 
         except Exception as e:
             return Response({"status": False, "message": str(e), "cmf_fournis": []})
+
+
+class BLAutoComplete(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            search = request.GET.get("search", "").strip()
+
+            if not search:
+                return Response({"status": True, "t_entree": []})
+
+            # Récupérer les 30 commandes fournisseurs correspondantes
+            entree = TEntree.objects.filter(
+                ent_code__icontains=search
+            ).order_by(
+                Case(
+                    When(ent_code__istartswith=search, then=0),
+                    default=1,
+                    output_field=IntegerField(),
+                ),
+                "ent_code",
+            )[:30]
+
+            result = []
+
+            for ligne in entree:
+                # ==========================================
+                # LIGNES DE LA COMMANDE
+                # ==========================================
+
+                lignes = TLigneEntree.objects.filter(
+                    entl_ent_code=ligne.ent_code
+                )
+
+                # Récupérer les codes articles
+                art_codes = [
+                    ligne.entl_art_code for ligne in lignes if ligne.entl_art_code
+                ]
+
+                # Récupérer les articles
+                articles = TArticle.objects.filter(art_code__in=art_codes)
+
+                # Dictionnaire des articles
+                articles_dict = {article.art_code: article for article in articles}
+
+                # ==========================================
+                # INFORMATIONS DU FOURNISSEUR
+                # ==========================================
+
+                fournisseur_obj = TFournis.objects.filter(
+                    fou_code=ligne.ent_fou_code
+                ).first()
+
+                # ==========================================
+                # DONNÉES DE LA COMMANDE
+                # ==========================================
+
+                fournisseur_data = EntreeSerializer(ligne).data
+
+                # ==========================================
+                # AJOUTER LE FOURNISSEUR
+                # ==========================================
+
+                fournisseur_data["fournisseur"] = (
+                    FournisseurSerializers(fournisseur_obj).data
+                    if fournisseur_obj
+                    else None
+                )
+
+                # ==========================================
+                # AJOUTER LES LIGNES
+                # ==========================================
+
+                fournisseur_data["ligne"] = []
+
+                for ligne in lignes:
+                    article = articles_dict.get(ligne.entl_art_code)
+
+                    fournisseur_data["ligne"].append(
+                        {
+                            "entl_cmf_code": ligne.entl_ent_code,
+                            "entl_Quantite": ligne.entl_quantite,
+                            "entl_PrixAchat": ligne.entl_prix,
+                            "entl_Tva": ligne.entl_tva,
+                            "entl_TotalHT": ligne.entl_ht,
+                            "entl_Art_Code": ligne.entl_art_code,
+                            "entl_fou_Code": ligne.entl_fou_code,
+                            "entl_TotalTTC": ligne.entl_ttc,
+                            "entl_pri_id": ligne.entl_id,
+                            "entl_dateper": ligne.entl_dateper,
+                            # Informations de l'article
+                            "art_nom": (article.art_nom if article else ""),
+                        }
+                    )
+
+                result.append(fournisseur_data)
+
+            return Response({"status": True, "t_entree": result})
+
+        except Exception as e:
+            return Response({"status": False, "message": str(e), "t_entree": []})
 
 
 class StockViewSet(viewsets.GenericViewSet):
