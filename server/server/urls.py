@@ -118,5 +118,10 @@ urlpatterns = [
         "api/bl-autocomplete/",
         views.BLAutoComplete.as_view(),
         name="bl-autocomplete"
+    ),
+    path(
+        "api/fa-autocomplete/",
+        views.FAAutoComplete.as_view(),
+        name="fa-autocomplete"
     )
 ]

@@ -855,9 +855,7 @@ class BLAutoComplete(APIView):
                 return Response({"status": True, "t_entree": []})
 
             # Récupérer les 30 commandes fournisseurs correspondantes
-            entree = TEntree.objects.filter(
-                ent_code__icontains=search
-            ).order_by(
+            entree = TEntree.objects.filter(ent_code__icontains=search).order_by(
                 Case(
                     When(ent_code__istartswith=search, then=0),
                     default=1,
@@ -873,9 +871,7 @@ class BLAutoComplete(APIView):
                 # LIGNES DE LA COMMANDE
                 # ==========================================
 
-                lignes = TLigneEntree.objects.filter(
-                    entl_ent_code=ligne.ent_code
-                )
+                lignes = TLigneEntree.objects.filter(entl_ent_code=ligne.ent_code)
 
                 # Récupérer les codes articles
                 art_codes = [
@@ -944,6 +940,103 @@ class BLAutoComplete(APIView):
 
         except Exception as e:
             return Response({"status": False, "message": str(e), "t_entree": []})
+
+
+class FAAutoComplete(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            search = request.GET.get("search", "").strip()
+
+            if not search:
+                return Response({"status": True, "t_vente": []})
+
+            # Récupérer les 30 commandes fournisseurs correspondantes
+            entree = TVente.objects.filter(vte_code__icontains=search).order_by(
+                Case(
+                    When(vte_code__istartswith=search, then=0),
+                    default=1,
+                    output_field=IntegerField(),
+                ),
+                "vte_code",
+            )[:10]
+
+            result = []
+
+            for ligne in entree:
+                # ==========================================
+                # LIGNES DE LA COMMANDE
+                # ==========================================
+
+                lignes = TLigneVente.objects.filter(vtel_vte_code=ligne.vte_code)
+                # Récupérer les codes articles
+                art_codes = [
+                    ligne.vtel_art_code for ligne in lignes if ligne.vtel_art_code
+                ]
+
+                # Récupérer les articles
+                articles = TArticle.objects.filter(art_code__in=art_codes)
+
+                # Dictionnaire des articles
+                articles_dict = {article.art_code: article for article in articles}
+
+                # ==========================================
+                # INFORMATIONS DU FOURNISSEUR
+                # ==========================================
+
+                fournisseur_obj = TClient.objects.filter(
+                    cli_code=ligne.vte_cli_code
+                ).first()
+
+                # ==========================================
+                # DONNÉES DE LA COMMANDE
+                # ==========================================
+
+                fournisseur_data = VenteSerializers(ligne).data
+
+                # ==========================================
+                # AJOUTER LE CLIENT
+                # ==========================================
+
+                fournisseur_data["client"] = (
+                    ClientsSerializers(fournisseur_obj).data
+                    if fournisseur_obj
+                    else None
+                )
+
+                # ==========================================
+                # AJOUTER LES LIGNES
+                # ==========================================
+
+                fournisseur_data["ligne"] = []
+
+                for ligne in lignes:
+                    article = articles_dict.get(ligne.vtel_art_code)
+                    fournisseur_data["ligne"].append(
+                        {
+                            "vtel_cmf_code": ligne.vtel_vte_code,
+                            "vtel_Quantite": ligne.vtel_quantite,
+                            "vtel_Tva": ligne.vtel_tva,
+                            "vtel_TotalHT": ligne.vtel_ht,
+                            "vtel_Art_Code": ligne.vtel_art_code,
+                            "vtel_fou_Code": ligne.vtel_cli_code,
+                            "vtel_TotalTTC": ligne.vtel_ttc,
+                            "vtel_pri_unit": ligne.vtel_prixunit,
+                            "vtel_lot_code": ligne.vtel_lot_code,
+                            "vtel_dateper": ligne.vtel_lot_dateper,
+                            "vtel_pri_id": ligne.vtel_pri_id,
+                            # Informations de l'article
+                            "art_nom": (article.art_nom if article else ""),
+                        }
+                    )
+
+                result.append(fournisseur_data)
+
+            return Response({"status": True, "t_vente": result})
+
+        except Exception as e:
+            return Response({"status": False, "message": str(e), "t_vente": []})
 
 
 class StockViewSet(viewsets.GenericViewSet):
