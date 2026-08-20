@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from polls import views
+from polls.vente.views import ValiderVenteView
 
 router = DefaultRouter()
 
@@ -123,5 +124,6 @@ urlpatterns = [
         "api/fa-autocomplete/",
         views.FAAutoComplete.as_view(),
         name="fa-autocomplete"
-    )
+    ),
+    path("api/vente/valider/", ValiderVenteView.as_view(), name="valider-vente"),
 ]

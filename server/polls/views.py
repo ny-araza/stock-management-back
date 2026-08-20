@@ -1094,13 +1094,33 @@ class StockViewSet(viewsets.GenericViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
+            # Sérialisation du stock comme avant
             serializer = self.get_serializer(stock)
+
+            # On récupère le dictionnaire du stock
+            stock_data = serializer.data
+
+            # Récupérer tous les lots ayant le même code article
+            lots = TLot.objects.filter(lot_art_code=art_code).values(
+                "lot_id", "lot_code", "lot_dateper", "lot_art_quantite"
+            )
+
+            # Ajouter les lots dans le JSON du stock
+            stock_data["lots"] = [
+                {
+                    "lot_id": lot["lot_id"],
+                    "lot_code": lot["lot_code"],
+                    "lot_dateper": lot["lot_dateper"],
+                    "lot_qte": lot["lot_art_quantite"],
+                }
+                for lot in lots
+            ]
 
             return Response(
                 {
                     "status": True,
                     "message": "ok",
-                    "stock": serializer.data,
+                    "stock": stock_data,
                 },
                 status=status.HTTP_200_OK,
             )
@@ -1114,7 +1134,6 @@ class StockViewSet(viewsets.GenericViewSet):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-    
 
     def list(self, request, *args, **kwargs):
         try:
