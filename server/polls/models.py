@@ -696,7 +696,7 @@ class TLot(models.Model):
     lot_datefin = models.DateTimeField(db_column='lot_DateFin', blank=True, null=True)  # Field name made lowercase.
     lot_datedeb = models.DateTimeField(db_column='lot_DateDeb', blank=True, null=True)  # Field name made lowercase.
     lot_art_code = models.CharField(db_column='lot_Art_Code', max_length=25, blank=True, null=True)  # Field name made lowercase.
-
+    lot_art_quantite = models.IntegerField(db_column='lot_art_quantite')
     class Meta:
         managed = False
         db_table = 't_lot'

@@ -694,14 +694,18 @@ class ArticleAutoComplete(APIView):
             if not search:
                 return Response({"status": True, "articles": []})
 
-            # Recherche des articles par code OU par nom
+            # Recherche des articles par nom
             article_codes = TArticle.objects.filter(
                 art_nom__icontains=search
             ).values_list("art_code", flat=True)
 
-            articles = TPrix.objects.filter(
-                Q(pri_art_code__icontains=search) | Q(pri_art_code__in=article_codes)
-            ).values("pri_id", "pri_art_code", "pri_achat", "pri_vte")
+            # Recherche des prix/articles par code ou nom
+            articles = list(
+                TPrix.objects.filter(
+                    Q(pri_art_code__icontains=search)
+                    | Q(pri_art_code__in=article_codes)
+                ).values("pri_id", "pri_art_code", "pri_achat", "pri_vte")
+            )
 
             if not articles:
                 return Response(
@@ -712,15 +716,39 @@ class ArticleAutoComplete(APIView):
                     }
                 )
 
-            # Récupération des noms correspondant aux codes
-            codes = [a["pri_art_code"] for a in articles]
+            # Codes des articles trouvés
+            codes = list(set(a["pri_art_code"] for a in articles))
 
-            noms_articles = {
-                article["art_code"]: article["art_nom"]
-                for article in TArticle.objects.filter(art_code__in=codes).values(
-                    "art_code", "art_nom"
+            # Informations des articles
+            articles_data = TArticle.objects.filter(art_code__in=codes).values(
+                "art_code", "art_nom"
+            )
+
+            # Dictionnaire des articles
+            articles_dict = {article["art_code"]: article for article in articles_data}
+
+            # Récupération de TOUS les lots des articles
+            lots = TLot.objects.filter(lot_art_code__in=codes).values(
+                "lot_id", "lot_art_code", "lot_code", "lot_dateper", "lot_art_quantite"
+            )
+
+            # Regrouper les lots par article
+            lots_par_article = {}
+
+            for lot in lots:
+                article_code = lot["lot_art_code"]
+
+                if article_code not in lots_par_article:
+                    lots_par_article[article_code] = []
+
+                lots_par_article[article_code].append(
+                    {
+                        "lot_id": lot["lot_id"],
+                        "lot_code": lot["lot_code"],
+                        "lot_datePeremption": lot["lot_dateper"],
+                        "lot_quantite": lot["lot_art_quantite"],
+                    }
                 )
-            }
 
             return Response(
                 {
@@ -731,7 +759,11 @@ class ArticleAutoComplete(APIView):
                             "code": a["pri_art_code"],
                             "prix_ht": a["pri_achat"],
                             "prix_vte": a["pri_vte"],
-                            "nom_article": noms_articles.get(a["pri_art_code"], ""),
+                            "nom_article": articles_dict.get(a["pri_art_code"], {}).get(
+                                "art_nom", ""
+                            ),
+                            # Tableau des lots
+                            "lots": lots_par_article.get(a["pri_art_code"], []),
                         }
                         for a in articles
                     ],
@@ -830,7 +862,6 @@ class CFAutoComplete(APIView):
                             "cmfl_fou_Code": ligne.cmfl_fou_code,
                             "cmfl_TotalTTC": ligne.cmfl_totalttc,
                             "cmfl_pri_id": ligne.cmfl_id,
-                            "cmfl_dateper": ligne.cmfl_dateper,
                             # Informations de l'article
                             "art_nom": (article.art_nom if article else ""),
                         }
@@ -1083,6 +1114,7 @@ class StockViewSet(viewsets.GenericViewSet):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+    
 
     def list(self, request, *args, **kwargs):
         try:
