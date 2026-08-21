@@ -8,6 +8,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser
 
+from .managers import TUsersManager
+
 class AuthGroup(models.Model):
     name = models.CharField(unique=True, max_length=150)
 

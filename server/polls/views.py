@@ -4,6 +4,7 @@ from django.db.models import Case, Exists, IntegerField, OuterRef, Q, Subquery, 
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action, api_view
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -11,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .authentication import CookieJWTAuthentification
+# from .authentication import SessionAuthentication
 from .filters import (
     ArticleFilter,
     BcFilter,
@@ -28,6 +29,7 @@ from .filters import (
 )
 from .models import (
     TArticle,
+    TAutorisation,
     TClient,
     TCmdFournis,
     TEntree,
@@ -143,7 +145,7 @@ class ArticlesViewSet(viewsets.ModelViewSet):
     serializer_class = ArticlesSerializers
     pagination_class = ListPagination
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
 
     filter_backends = [
         DjangoFilterBackend,
@@ -183,7 +185,7 @@ class ArticlesViewSet(viewsets.ModelViewSet):
 
 class CurrentUserViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
 
     def list(self, request):
         """
@@ -193,6 +195,12 @@ class CurrentUserViewSet(viewsets.GenericViewSet):
         """
         try:
             user = request.user
+
+            # Récupérer les autorisations de l'utilisateur
+            authorizations = TAutorisation.objects.filter(
+                aut_acc_code=user.use_acc_code
+            ).values("aut_acc_code", "aut_men_code", "aut_acces")
+
             return Response(
                 {
                     "status": True,
@@ -202,6 +210,8 @@ class CurrentUserViewSet(viewsets.GenericViewSet):
                         "use_acc_code": user.use_acc_code,
                         "use_enabled": user.use_enabled,
                     },
+                    # Ajout des autorisations
+                    "authorizations": list(authorizations),
                 },
                 status=status.HTTP_200_OK,
             )
@@ -219,7 +229,7 @@ class CurrentUserViewSet(viewsets.GenericViewSet):
 # view client
 class ClientViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
     queryset = TClient.objects.all()
     serializer_class = ClientsSerializers
     pagination_class = ListPagination
@@ -310,7 +320,7 @@ class ClientViewSet(viewsets.GenericViewSet):
 # view vente  list
 class VenteViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
     queryset = TVente.objects.all()
     serializer_class = VenteSerializers
     pagination_class = ListPagination
@@ -365,7 +375,7 @@ class VenteViewSet(viewsets.GenericViewSet):
 # liste BC
 class BcViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
     queryset = TCmdFournis.objects.all()
     serializer_class = BcSerializers
     pagination_class = ListPagination
@@ -419,7 +429,7 @@ class BcViewSet(viewsets.GenericViewSet):
 # liste BC
 class FournisseurViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
     queryset = TFournis.objects.all()
     serializer_class = FournisseurSerializers
     pagination_class = ListPagination
@@ -474,7 +484,7 @@ class FournisseurViewSet(viewsets.GenericViewSet):
 
 class FamilleViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
     queryset = TFamille.objects.all()
     serializer_class = FamilleSerializers
 
@@ -495,7 +505,7 @@ class FamilleViewSet(viewsets.GenericViewSet):
 
 class SousFamilleViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
     queryset = TSousFamille.objects.all()
     serializer_class = SousFamilleSerializers
 
@@ -1072,7 +1082,7 @@ class FAAutoComplete(APIView):
 
 class StockViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
     queryset = TStock.objects.all()
     serializer_class = StockSerializers
     pagination_class = ListPagination
@@ -1222,7 +1232,7 @@ class EntreeViewSet(viewsets.ModelViewSet):
     serializer_class = EntreeSerializer
     pagination_class = ListPagination
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
 
     filter_backends = [
         DjangoFilterBackend,
@@ -1282,7 +1292,7 @@ class SortitViewSet(viewsets.ModelViewSet):
     serializer_class = SortitSerializer
     pagination_class = ListPagination
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
 
     filter_backends = [
         DjangoFilterBackend,
@@ -1341,7 +1351,7 @@ class InStockViewSet(viewsets.ModelViewSet):
     serializer_class = InStockSerializer
     pagination_class = ListPagination
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
 
     filter_backends = [
         DjangoFilterBackend,
@@ -1400,7 +1410,7 @@ class MvtStockViewSet(viewsets.ModelViewSet):
     serializer_class = MvtStockSerializer
     pagination_class = ListPagination
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
 
     filter_backends = [
         DjangoFilterBackend,
@@ -1458,7 +1468,7 @@ class MvtStockViewSett(viewsets.ModelViewSet):
 
     permission_classes = [IsAuthenticated]
 
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
 
     filter_backends = [
         DjangoFilterBackend,
@@ -1483,7 +1493,7 @@ class RtfViewSet(viewsets.ModelViewSet):
     serializer_class = RtfSerializer
     pagination_class = ListPagination
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
 
     filter_backends = [
         DjangoFilterBackend,
@@ -1543,7 +1553,7 @@ class RtcViewSet(viewsets.ModelViewSet):
     serializer_class = RtcSerializer
     pagination_class = ListPagination
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CookieJWTAuthentification]
+    authentication_classes = [SessionAuthentication]
 
     filter_backends = [
         DjangoFilterBackend,
