@@ -263,7 +263,7 @@ class ClientViewSet(viewsets.GenericViewSet):
                         | Q(cli_type__icontains=search)
                         | Q(cli_modepay__icontains=search)
                     )
-            queryset = queryset.order_by("cli_nom")
+            queryset = queryset.order_by("-cli_datecre")
             page = self.paginate_queryset(queryset)
 
             if page is not None:
@@ -336,6 +336,7 @@ class VenteViewSet(viewsets.GenericViewSet):
         try:
             # queryset = self.get_queryset()
             queryset = self.filter_queryset(self.get_queryset())
+            queryset = queryset.order_by("-vte_datecre")
             page = self.paginate_queryset(queryset)
 
             objets = page if page is not None else queryset
@@ -396,7 +397,7 @@ class BcViewSet(viewsets.GenericViewSet):
             if search:
                 for word in search.split():
                     queryset = queryset.filter(Q(cmf_code__icontains=search))
-            queryset = queryset.order_by("cmf_code")
+            queryset = queryset.order_by("-cmf_datecre")
             page = self.paginate_queryset(queryset)
 
             if page is not None:
@@ -452,7 +453,7 @@ class FournisseurViewSet(viewsets.GenericViewSet):
                     queryset = queryset.filter(
                         Q(fou_code__icontains=search) | Q(fou_nom__icontains=search)
                     )
-            queryset = queryset.order_by("fou_code")
+            queryset = queryset.order_by("-fou_datecre")
             page = self.paginate_queryset(queryset)
 
             if page is not None:
@@ -1243,7 +1244,7 @@ class EntreeViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.filter_queryset(self.get_queryset()).order_by("ent_id")
+            queryset = self.filter_queryset(self.get_queryset()).order_by("-ent_datecre")
             page = self.paginate_queryset(queryset)
 
             objets = page if page is not None else queryset
@@ -1303,7 +1304,7 @@ class SortitViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.filter_queryset(self.get_queryset()).order_by("out_id")
+            queryset = self.filter_queryset(self.get_queryset()).order_by("-out_datecre")
             page = self.paginate_queryset(queryset)
 
             objets = page if page is not None else queryset
@@ -1362,7 +1363,7 @@ class InStockViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.filter_queryset(self.get_queryset()).order_by("in_id")
+            queryset = self.filter_queryset(self.get_queryset()).order_by("-in_datecre")
             page = self.paginate_queryset(queryset)
 
             objets = page if page is not None else queryset
@@ -1421,7 +1422,7 @@ class MvtStockViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.filter_queryset(self.get_queryset()).order_by("mvt_id")
+            queryset = self.filter_queryset(self.get_queryset()).order_by("-mvt_datecre")
             page = self.paginate_queryset(queryset)
 
             objets = page if page is not None else queryset
@@ -1460,7 +1461,7 @@ class MvtStockViewSet(viewsets.ModelViewSet):
 
 
 class MvtStockViewSett(viewsets.ModelViewSet):
-    queryset = TMvtStock.objects.all().order_by("-mvt_id")
+    queryset = TMvtStock.objects.all().order_by("-mvt_datecre")
 
     serializer_class = MvtStockSerializer
 
@@ -1485,7 +1486,7 @@ class MvtStockViewSett(viewsets.ModelViewSet):
         "mvt_datemdf",
     ]
 
-    ordering = ["-mvt_id"]
+    ordering = ["-mvt_datecre"]
 
 
 class RtfViewSet(viewsets.ModelViewSet):
@@ -1504,7 +1505,7 @@ class RtfViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.filter_queryset(self.get_queryset()).order_by("rtf_id")
+            queryset = self.filter_queryset(self.get_queryset()).order_by("-rtf_datecre")
             page = self.paginate_queryset(queryset)
 
             objets = page if page is not None else queryset
@@ -1564,7 +1565,7 @@ class RtcViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.filter_queryset(self.get_queryset()).order_by("rtc_id")
+            queryset = self.filter_queryset(self.get_queryset()).order_by("-rtc_datecre")
             page = self.paginate_queryset(queryset)
 
             objets = page if page is not None else queryset
