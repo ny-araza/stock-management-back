@@ -1,7 +1,19 @@
 # from django.shortcuts import render
+from pickletools import float8
+
 from django.conf import settings
-from django.db.models import Case, Exists, IntegerField, OuterRef, Q, Subquery, When
+from django.db.models import (
+    Case,
+    Exists,
+    IntegerField,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+    When,
+)
 from django.utils import timezone
+from django.utils.regex_helper import get_quantifier
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.authentication import SessionAuthentication
@@ -12,7 +24,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-# from .authentication import SessionAuthentication
 from .filters import (
     ArticleFilter,
     BcFilter,
@@ -715,7 +726,7 @@ class ArticleAutoComplete(APIView):
                 TPrix.objects.filter(
                     Q(pri_art_code__icontains=search)
                     | Q(pri_art_code__in=article_codes)
-                ).values("pri_id", "pri_art_code", "pri_achat", "pri_vte")
+                ).values("pri_id", "pri_art_code", "pri_achat", "pri_vte", "pri_tva")
             )
 
             if not articles:
@@ -735,13 +746,31 @@ class ArticleAutoComplete(APIView):
                 "art_code", "art_nom"
             )
 
+            def get_quantite(code: str) -> int:
+                total_quantite_lots = (
+                    TLot.objects.filter(
+                        lot_art_code=code, lot_dateper__gt=timezone.now().date()
+                    ).aggregate(total=Sum("lot_art_quantite"))
+                )["total"] or 0
+                return total_quantite_lots
+
             # Dictionnaire des articles
             articles_dict = {article["art_code"]: article for article in articles_data}
 
             # Récupération de TOUS les lots des articles
-            lots = TLot.objects.filter(lot_art_code__in=codes).values(
+            lots = TLot.objects.filter(
+                lot_art_code__in=codes, lot_dateper__gt=timezone.now().date()
+            ).values(
                 "lot_id", "lot_art_code", "lot_code", "lot_dateper", "lot_art_quantite"
             )
+
+            def get_quantite(code: str) -> int:
+                total = 0
+
+                for lot in list(lots):
+                    if lot["lot_art_code"] == code:
+                        total += lot["lot_art_quantite"]
+                return total
 
             # Regrouper les lots par article
             lots_par_article = {}
@@ -770,9 +799,11 @@ class ArticleAutoComplete(APIView):
                             "code": a["pri_art_code"],
                             "prix_ht": a["pri_achat"],
                             "prix_vte": a["pri_vte"],
+                            "pri_tva": a["pri_tva"],
                             "nom_article": articles_dict.get(a["pri_art_code"], {}).get(
                                 "art_nom", ""
                             ),
+                            "quantite_stock": get_quantite(a["pri_art_code"]),
                             # Tableau des lots
                             "lots": lots_par_article.get(a["pri_art_code"], []),
                         }
@@ -1105,18 +1136,23 @@ class StockViewSet(viewsets.GenericViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            # Sérialisation du stock comme avant
+            # Sérialisation du stock
             serializer = self.get_serializer(stock)
-
-            # On récupère le dictionnaire du stock
             stock_data = serializer.data
 
-            # Récupérer tous les lots ayant le même code article
-            lots = TLot.objects.filter(lot_art_code=art_code).values(
-                "lot_id", "lot_code", "lot_dateper", "lot_art_quantite"
-            )
+            # Récupérer tous les lots de l'article
+            lots = TLot.objects.filter(
+                lot_art_code=art_code, lot_dateper__gt=timezone.now().date()
+            ).values("lot_id", "lot_code", "lot_dateper", "lot_art_quantite")
 
-            # Ajouter les lots dans le JSON du stock
+            # Calcul du total des quantités de tous les lots
+            total_quantite_lots = (
+                TLot.objects.filter(
+                    lot_art_code=art_code, lot_dateper__gt=timezone.now().date()
+                ).aggregate(total=Sum("lot_art_quantite"))
+            )["total"] or 0
+
+            # Ajouter les lots
             stock_data["lots"] = [
                 {
                     "lot_id": lot["lot_id"],
@@ -1126,6 +1162,9 @@ class StockViewSet(viewsets.GenericViewSet):
                 }
                 for lot in lots
             ]
+
+            # Ajouter le total des quantités des lots
+            stock_data["total_quantite_lots"] = total_quantite_lots
 
             return Response(
                 {
@@ -1164,7 +1203,7 @@ class StockViewSet(viewsets.GenericViewSet):
                 .values("stk_id")[:1]
             )
 
-            # Garder uniquement la dernière ligne de chaque stk_art_code
+            # Garder uniquement la dernière ligne de chaque article
             queryset = queryset.filter(stk_id=Subquery(derniere_ligne))
 
             # Pagination
@@ -1176,13 +1215,24 @@ class StockViewSet(viewsets.GenericViewSet):
                 data = serializer.data
 
                 for stock in data:
-                    article = TArticle.objects.filter(
-                        art_code=stock["stk_art_code"]
-                    ).first()
+                    art_code = stock["stk_art_code"]
+
+                    # Récupérer l'article
+                    article = TArticle.objects.filter(art_code=art_code).first()
 
                     stock["article_table"] = (
                         ArticlesSerializers(article).data if article else None
                     )
+
+                    # Calculer le total des quantités des lots
+                    total_quantite_lots = (
+                        TLot.objects.filter(lot_art_code=art_code).aggregate(
+                            total=Sum("lot_art_quantite")
+                        )
+                    )["total"] or 0
+
+                    # Ajouter le total dans le JSON
+                    stock["total_quantite_lots"] = total_quantite_lots
 
                 return Response(
                     {
@@ -1197,18 +1247,30 @@ class StockViewSet(viewsets.GenericViewSet):
                     }
                 )
 
+            # Sans pagination
             serializer = self.get_serializer(queryset, many=True)
 
             data = serializer.data
 
             for stock in data:
-                article = TArticle.objects.filter(
-                    art_code=stock["stk_art_code"]
-                ).first()
+                art_code = stock["stk_art_code"]
+
+                # Récupérer l'article
+                article = TArticle.objects.filter(art_code=art_code).first()
 
                 stock["article_table"] = (
                     ArticlesSerializers(article).data if article else None
                 )
+
+                # Calculer le total des quantités des lots
+                total_quantite_lots = (
+                    TLot.objects.filter(lot_art_code=art_code).aggregate(
+                        total=Sum("lot_art_quantite")
+                    )
+                )["total"] or 0
+
+                # Ajouter le total
+                stock["total_quantite_lots"] = total_quantite_lots
 
             return Response(
                 {
@@ -1244,7 +1306,9 @@ class EntreeViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.filter_queryset(self.get_queryset()).order_by("-ent_datecre")
+            queryset = self.filter_queryset(self.get_queryset()).order_by(
+                "-ent_datecre"
+            )
             page = self.paginate_queryset(queryset)
 
             objets = page if page is not None else queryset
@@ -1304,7 +1368,9 @@ class SortitViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.filter_queryset(self.get_queryset()).order_by("-out_datecre")
+            queryset = self.filter_queryset(self.get_queryset()).order_by(
+                "-out_datecre"
+            )
             page = self.paginate_queryset(queryset)
 
             objets = page if page is not None else queryset
@@ -1422,7 +1488,9 @@ class MvtStockViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.filter_queryset(self.get_queryset()).order_by("-mvt_datecre")
+            queryset = self.filter_queryset(self.get_queryset()).order_by(
+                "-mvt_datecre"
+            )
             page = self.paginate_queryset(queryset)
 
             objets = page if page is not None else queryset
@@ -1505,7 +1573,9 @@ class RtfViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.filter_queryset(self.get_queryset()).order_by("-rtf_datecre")
+            queryset = self.filter_queryset(self.get_queryset()).order_by(
+                "-rtf_datecre"
+            )
             page = self.paginate_queryset(queryset)
 
             objets = page if page is not None else queryset
@@ -1565,7 +1635,9 @@ class RtcViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.filter_queryset(self.get_queryset()).order_by("-rtc_datecre")
+            queryset = self.filter_queryset(self.get_queryset()).order_by(
+                "-rtc_datecre"
+            )
             page = self.paginate_queryset(queryset)
 
             objets = page if page is not None else queryset

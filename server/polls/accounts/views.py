@@ -4,7 +4,7 @@ from django.contrib.auth import login as django_login
 from django.contrib.auth import logout as django_logout
 from django.middleware.csrf import get_token
 from django.utils import timezone
-from polls.models import TAutorisation, TUsers
+from polls.models import TAutorisation, TLot, TUsers
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -23,6 +23,7 @@ def serialize_user(user: TUsers) -> dict:
         "use_acc_code": user.use_acc_code,
         "use_enabled": bool(user.use_enabled),
     }
+
 
 
 class CsrfView(APIView):
@@ -162,4 +163,103 @@ class CreateUserView(APIView):
                 "user": serialize_user(user),
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class UpdateUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, user_id):
+        try:
+            user = TUsers.objects.get(use_id=user_id)
+        except TUsers.DoesNotExist:
+            return Response(
+                {
+                    "status": False,
+                    "message": "Utilisateur introuvable",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        use_login = (request.data.get("use_login") or "").strip()
+        use_pwd = request.data.get("use_pwd")
+        # Vérifier le login
+        if use_login:
+            # Vérifie qu'un autre utilisateur n'utilise pas déjà ce login
+            login_exists = (
+                TUsers.objects.filter(use_login=use_login)
+                .exclude(use_id=user_id)
+                .exists()
+            )
+
+            if login_exists:
+                return Response(
+                    {
+                        "status": False,
+                        "message": "Ce login existe déjà",
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            user.use_login = use_login
+
+        # Modifier le mot de passe seulement s'il est fourni
+        if use_pwd and use_pwd.strip():
+            if len(use_pwd) < 4:
+                return Response(
+                    {
+                        "status": False,
+                        "message": "Mot de passe trop court (4 caractères minimum)",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            user.use_pwd = hash_password_sha256(use_pwd)
+
+        # Informations de modification
+        user.use_datemdf = timezone.now()
+        user.use_usermdf = request.user.use_login
+
+        user.save()
+
+        return Response(
+            {
+                "status": True,
+                "message": "Utilisateur modifié avec succès",
+                "user": serialize_user(user),
+            }
+        )
+
+
+class UpdateLotView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, lot_id):
+        try:
+            print("ceci est l'update du lot ==> ",request.data)
+            lots = TLot.objects.get(lot_id=lot_id)
+        except TLot.DoesNotExist:
+            return Response(
+                {
+                    "status": False,
+                    "message": "Lot introuvable",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        lot_code = (request.data.get("lot_code") or "").strip()
+        lot_dateper = request.data.get("lot_dateper")
+        lot_art_code = request.data.get("lot_art_code")
+        lot_art_quantite = request.data.get("lot_art_quantite")
+        # Informations de modification
+        lots.lot_datemdf = timezone.now()
+        lots.lot_usemdf = request.data.get("lot_usemdf")
+        lots.lot_art_quantite = lot_art_quantite
+        lots.save()
+
+        return Response(
+            {
+                "status": True,
+                "message": "Lot modifié avec succès",
+            }
         )
