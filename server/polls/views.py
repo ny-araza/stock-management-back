@@ -899,6 +899,7 @@ class CFAutoComplete(APIView):
                             "cmfl_Quantite": ligne.cmfl_quantite,
                             "cmfl_PrixAchat": ligne.cmfl_prixachat,
                             "cmfl_Tva": ligne.cmfl_tva,
+                            "cmfl_montant_tva": (ligne.cmfl_tva / 100) * (ligne.cmfl_totalht),
                             "cmfl_TotalHT": ligne.cmfl_totalht,
                             "cmfl_Art_Code": ligne.cmfl_art_code,
                             "cmfl_fou_Code": ligne.cmfl_fou_code,
