@@ -4,7 +4,6 @@ from polls import views
 from polls.vente.views import ValiderVenteView
 from rest_framework.routers import DefaultRouter
 
-
 router = DefaultRouter()
 
 router.register(r"users", views.TUserViewset)
@@ -34,6 +33,16 @@ router.register(
 )
 
 router.register(r"retours_client", views.RtcViewSet, basename="retours_client")
+router.register(
+    r"new_liv_not_paye", views.NotificationPaiementView, basename="new_liv_not_paye"
+)
+
+
+router.register(
+    r"lots",
+    views.LotViewSet,
+    basename="lots",
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),

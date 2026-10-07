@@ -1,4 +1,5 @@
 # from django.shortcuts import render
+from datetime import timedelta
 from pickletools import float8
 
 from django.conf import settings
@@ -626,6 +627,8 @@ def dynamic_create_view(request):
                 prefix = "rtc"
             elif table_name == "t_ligne_rtc":
                 prefix = "rtcl"
+            elif table_name == "t_ligne_proforma":
+                prefix = "prol"
             else:
                 for i in range(2, 5):
                     prefix += table_name[i]
@@ -764,14 +767,6 @@ class ArticleAutoComplete(APIView):
                 "lot_id", "lot_art_code", "lot_code", "lot_dateper", "lot_art_quantite"
             )
 
-            def get_quantite(code: str) -> int:
-                total = 0
-
-                for lot in list(lots):
-                    if lot["lot_art_code"] == code:
-                        total += lot["lot_art_quantite"]
-                return total
-
             # Regrouper les lots par article
             lots_par_article = {}
 
@@ -789,7 +784,6 @@ class ArticleAutoComplete(APIView):
                         "lot_quantite": lot["lot_art_quantite"],
                     }
                 )
-
             return Response(
                 {
                     "status": True,
@@ -899,7 +893,8 @@ class CFAutoComplete(APIView):
                             "cmfl_Quantite": ligne.cmfl_quantite,
                             "cmfl_PrixAchat": ligne.cmfl_prixachat,
                             "cmfl_Tva": ligne.cmfl_tva,
-                            "cmfl_montant_tva": (ligne.cmfl_tva / 100) * (ligne.cmfl_totalht),
+                            "cmfl_montant_tva": (ligne.cmfl_tva / 100)
+                            * (ligne.cmfl_totalht),
                             "cmfl_TotalHT": ligne.cmfl_totalht,
                             "cmfl_Art_Code": ligne.cmfl_art_code,
                             "cmfl_fou_Code": ligne.cmfl_fou_code,
@@ -1680,3 +1675,142 @@ class RtcViewSet(viewsets.ModelViewSet):
                     "retour_client": [],
                 }
             )
+
+
+# checjk if the datepay is <= toaday
+
+
+class NotificationPaiementView(viewsets.ModelViewSet):
+    serializer_class = EntreeSerializer
+    pagination_class = ListPagination
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [SessionAuthentication]
+
+    def get_queryset(self):
+        today = timezone.localdate()
+        date_limite = today + timedelta(days=2)
+
+        return TEntree.objects.filter(
+            ent_is_paye=False,
+            ent_datepay__isnull=False,
+            ent_datepay__lte=date_limite,
+        ).order_by("-ent_datecre", "ent_datepay", "-ent_id")
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+
+            page = self.paginate_queryset(queryset)
+
+            objets = page if page is not None else queryset
+
+            serializer = self.get_serializer(objets, many=True)
+
+            data = serializer.data
+
+            if page is not None:
+                return Response(
+                    {
+                        "status": True,
+                        "message": "ok",
+                        "date_aujourd_hui": timezone.localdate(),
+                        "date_limite": timezone.localdate() + timedelta(days=2),
+                        "count": self.paginator.page.paginator.count,
+                        "total_pages": self.paginator.page.paginator.num_pages,
+                        "current_page": self.paginator.page.number,
+                        "next": self.paginator.get_next_link(),
+                        "previous": self.paginator.get_previous_link(),
+                        "notifications": data,
+                    }
+                )
+
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "date_aujourd_hui": timezone.localdate(),
+                    "date_limite": timezone.localdate() + timedelta(days=2),
+                    "count": len(data),
+                    "notifications": data,
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "notifications": [],
+                }
+            )
+
+
+class LotViewSet(viewsets.ViewSet):
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="deduire-quantite",
+    )
+    def deduire_quantite(self, request):
+        lot_id = request.data.get("lot_id")
+        art_code = request.data.get("art_code")
+        quantite = request.data.get("quantite")
+
+        print(lot_id, art_code, quantite)
+
+        if not lot_id or not art_code or quantite is None:
+            return Response(
+                {"error": ("lot_id, art_code et quantite sont obligatoires.")},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            quantite = int(quantite)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "La quantité doit être un entier."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if quantite <= 0:
+            return Response(
+                {"error": "La quantité doit être supérieure à 0."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            lot = TLot.objects.get(
+                lot_id=lot_id,
+                lot_art_code=art_code,
+            )
+        except TLot.DoesNotExist:
+            return Response(
+                {"error": "Lot introuvable."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        ancienne_quantite = lot.lot_art_quantite
+
+        if ancienne_quantite < quantite:
+            return Response(
+                {
+                    "error": "Stock insuffisant.",
+                    "stock_disponible": ancienne_quantite,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        lot.lot_art_quantite = ancienne_quantite - quantite
+        lot.save(update_fields=["lot_art_quantite"])
+
+        return Response(
+            {
+                "message": "Quantité déduite avec succès.",
+                "lot_id": lot.lot_id,
+                "art_code": lot.lot_art_code,
+                "ancienne_quantite": ancienne_quantite,
+                "quantite_deduite": quantite,
+                "nouvelle_quantite": lot.lot_art_quantite,
+            },
+            status=status.HTTP_200_OK,
+        )

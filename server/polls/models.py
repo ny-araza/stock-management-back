@@ -355,7 +355,7 @@ class TEntree(models.Model):
     ent_montant_ht = models.DecimalField(db_column='ent_Montant_HT', max_digits=18, decimal_places=2)  # Field name made lowercase.
     ent_montant_ttc = models.DecimalField(db_column='ent_Montant_TTC', max_digits=18, decimal_places=2)  # Field name made lowercase.
     ent_cmf_code = models.CharField(db_column='ent_cmf_Code', max_length=20, blank=True, null=True)  # Field name made lowercase.
-
+    ent_is_paye = models.BooleanField(db_column='ent_is_paye')
     class Meta:
         managed = False
         db_table = 't_entree'
