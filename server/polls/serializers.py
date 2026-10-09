@@ -1,4 +1,4 @@
-from .models import TInStock, TLigneEntree, TLigneRtc, TLigneRtf, TLigneVente, TLot, TMvtStock, TOutStock, TPrix, TRetourClient, TRetourFournis, TStock, TUsers, TArticle, TClient, \
+from .models import TInStock, TLigneEntree, TLigneRtc, TLigneRtf, TLigneVente, TLot, TMvtStock, TOutStock, TPrix, TProforma, TRetourClient, TRetourFournis, TStock, TUsers, TArticle, TClient, \
                 TVente, TCmdFournis, TFournis, TFamille, TSousFamille, \
                 TEntree
 from rest_framework import serializers
@@ -64,6 +64,11 @@ class VenteSerializers(serializers.ModelSerializer):
 class BcSerializers(serializers.ModelSerializer):
     class Meta:
         model = TCmdFournis
+        fields = "__all__"
+
+class ProformaSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = TProforma
         fields = "__all__"
 
 

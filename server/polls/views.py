@@ -50,6 +50,7 @@ from .models import (
     TInStock,
     TLigneCmdFournis,
     TLigneEntree,
+    TLigneProforma,
     TLigneRtc,
     TLigneRtf,
     TLigneVente,
@@ -57,6 +58,7 @@ from .models import (
     TMvtStock,
     TOutStock,
     TPrix,
+    TProforma,
     TRetourClient,
     TRetourFournis,
     TSousFamille,
@@ -81,6 +83,7 @@ from .serializers import (
     LotSerializer,
     MvtStockSerializer,
     PrixSerializer,
+    ProformaSerializers,
     RtcSerializer,
     RtfSerializer,
     SortitSerializer,
@@ -911,6 +914,109 @@ class CFAutoComplete(APIView):
 
         except Exception as e:
             return Response({"status": False, "message": str(e), "cmf_fournis": []})
+
+
+class ProformaAutoComplete(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            search = request.GET.get("search", "").strip()
+
+            if not search:
+                return Response({"status": True, "proforma": []})
+
+            # Récupérer les 30 commandes fournisseurs correspondantes
+            list_proforma = TProforma.objects.filter(
+                pro_code__icontains=search
+            ).order_by(
+                Case(
+                    When(pro_code__istartswith=search, then=0),
+                    default=1,
+                    output_field=IntegerField(),
+                ),
+                "pro_code",
+            )[:30]
+
+            result = []
+
+            for p in list_proforma:
+                # ==========================================
+                # LIGNES DE LA COMMANDE
+                # ==========================================
+
+                lignes = TLigneProforma.objects.filter(
+                    prol_pro_code=p.pro_code
+                )
+
+                # Récupérer les codes articles
+                art_codes = [
+                    ligne.prol_art_code for ligne in lignes if ligne.prol_art_code
+                ]
+
+                # Récupérer les articles
+                articles = TArticle.objects.filter(art_code__in=art_codes)
+
+                # Dictionnaire des articles
+                articles_dict = {article.art_code: article for article in articles}
+
+                # ==========================================
+                # INFORMATIONS DU FOURNISSEUR
+                # ==========================================
+
+                p_obj = TClient.objects.filter(
+                    cli_code=p.pro_cli_code
+                ).first()
+
+                # ==========================================
+                # DONNÉES DE LA COMMANDE
+                # ==========================================
+
+                client_data = ProformaSerializers(p).data
+
+                # ==========================================
+                # AJOUTER LE FOURNISSEUR
+                # ==========================================
+
+                client_data["client"] = (
+                    ClientsSerializers(p_obj).data
+                    if p_obj
+                    else None
+                )
+
+                # ==========================================
+                # AJOUTER LES LIGNES
+                # ==========================================
+
+                client_data["ligne"] = []
+
+                for ligne in lignes:
+                    article = articles_dict.get(ligne.prol_art_code)
+
+                    client_data["ligne"].append(
+                        {
+                            "prol_pro_code": ligne.prol_pro_code,
+                            "prol_quantite": ligne.prol_quantite,
+                            "prol_prixvente": ligne.prol_prixunit,
+                            "prol_tva": ligne.prol_tva,
+                            "prol_montant_tva": (ligne.prol_tva / 100)
+                            * (ligne.prol_totalht),
+                            "prol_totalht": ligne.prol_totalht,
+                            "prol_art_code": ligne.prol_art_code,
+                            "prol_cli_code": ligne.prol_cli_code,
+                            "prol_totalttc": ligne.prol_totalttc,
+                            "prol_pri_id": ligne.prol_id,
+                            # Informations de l'article
+                            "art_nom": (article.art_nom if article else ""),
+                        }
+                    )
+
+                result.append(client_data)
+
+            return Response({"status": True, "proforma": result})
+
+        except Exception as e:
+            return Response({"status": False, "message": str(e), "proforma": []})
 
 
 class BLAutoComplete(APIView):

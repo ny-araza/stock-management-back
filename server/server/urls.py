@@ -78,6 +78,12 @@ urlpatterns = [
         views.CFAutoComplete.as_view(),
         name="cmf-fournis-autocomplete",
     ),
+
+    path(
+        "api/proforma-autocomplete/",
+        views.ProformaAutoComplete.as_view(),
+        name="proforma-autocomplete",
+    ),
     path(
         "api/bl-autocomplete/", views.BLAutoComplete.as_view(), name="bl-autocomplete"
     ),
