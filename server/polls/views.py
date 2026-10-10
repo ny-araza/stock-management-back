@@ -3,6 +3,7 @@ from datetime import timedelta
 from pickletools import float8
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import (
     Case,
     Exists,
@@ -813,6 +814,57 @@ class ArticleAutoComplete(APIView):
             return Response({"status": False, "message": str(e), "articles": []})
 
 
+class UpdateCmfView(APIView):
+    def patch(self, request, cmf_id):
+        try:
+            with transaction.atomic():
+                command = TCmdFournis.objects.get(cmf_id=cmf_id)
+
+                command.cmf_islivre = request.data.get(
+                    "pro_islivre", command.cmf_islivre
+                )
+                command.cmf_enabled = request.data.get(
+                    "pro_enabled", command.cmf_enabled
+                )
+                command.cmf_usermdf = request.data.get(
+                    "pro_usermdf", command.cmf_usermdf
+                )
+                command.cmf_datemdf = timezone.now()
+
+                command.save(
+                    update_fields=[
+                        "cmf_islivre",
+                        "cmf_enabled",
+                        "cmf_usermdf",
+                        "cmf_datemdf",
+                    ]
+                )
+
+            return Response(
+                {
+                    "message": "cmfforma mise à jour avec succès.",
+                    "cmf_id": command.cmf_id,
+                    "cmf_islivre": command.cmf_islivre,
+                    "cmf_enabled": command.cmf_enabled,
+                    "cmf_usermdf": command.cmf_usermdf,
+                    "cmf_datemdf": command.cmf_datemdf,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except TCmdFournis.DoesNotExist:
+            return Response(
+                {"error": "Cmf fournis introuvable."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class CFAutoComplete(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -825,7 +877,7 @@ class CFAutoComplete(APIView):
 
             # Récupérer les 30 commandes fournisseurs correspondantes
             cmf_fournis = TCmdFournis.objects.filter(
-                cmf_code__icontains=search
+                cmf_code__icontains=search, cmf_islivre=False
             ).order_by(
                 Case(
                     When(cmf_code__istartswith=search, then=0),
@@ -916,6 +968,57 @@ class CFAutoComplete(APIView):
             return Response({"status": False, "message": str(e), "cmf_fournis": []})
 
 
+class UpdateProformaView(APIView):
+    def patch(self, request, pro_id):
+        try:
+            with transaction.atomic():
+                proforma = TProforma.objects.get(pro_id=pro_id)
+
+                proforma.pro_islivre = request.data.get(
+                    "pro_islivre", proforma.pro_islivre
+                )
+                proforma.pro_enabled = request.data.get(
+                    "pro_enabled", proforma.pro_enabled
+                )
+                proforma.pro_usermdf = request.data.get(
+                    "pro_usermdf", proforma.pro_usermdf
+                )
+                proforma.pro_datemdf = timezone.now()
+
+                proforma.save(
+                    update_fields=[
+                        "pro_islivre",
+                        "pro_enabled",
+                        "pro_usermdf",
+                        "pro_datemdf",
+                    ]
+                )
+
+            return Response(
+                {
+                    "message": "Proforma mise à jour avec succès.",
+                    "pro_id": proforma.pro_id,
+                    "pro_islivre": proforma.pro_islivre,
+                    "pro_enabled": proforma.pro_enabled,
+                    "pro_usermdf": proforma.pro_usermdf,
+                    "pro_datemdf": proforma.pro_datemdf,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except TProforma.DoesNotExist:
+            return Response(
+                {"error": "Proforma introuvable."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class ProformaAutoComplete(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -928,7 +1031,8 @@ class ProformaAutoComplete(APIView):
 
             # Récupérer les 30 commandes fournisseurs correspondantes
             list_proforma = TProforma.objects.filter(
-                pro_code__icontains=search
+                pro_code__icontains=search,
+                pro_islivre=False,
             ).order_by(
                 Case(
                     When(pro_code__istartswith=search, then=0),
@@ -945,9 +1049,7 @@ class ProformaAutoComplete(APIView):
                 # LIGNES DE LA COMMANDE
                 # ==========================================
 
-                lignes = TLigneProforma.objects.filter(
-                    prol_pro_code=p.pro_code
-                )
+                lignes = TLigneProforma.objects.filter(prol_pro_code=p.pro_code)
 
                 # Récupérer les codes articles
                 art_codes = [
@@ -964,9 +1066,7 @@ class ProformaAutoComplete(APIView):
                 # INFORMATIONS DU FOURNISSEUR
                 # ==========================================
 
-                p_obj = TClient.objects.filter(
-                    cli_code=p.pro_cli_code
-                ).first()
+                p_obj = TClient.objects.filter(cli_code=p.pro_cli_code).first()
 
                 # ==========================================
                 # DONNÉES DE LA COMMANDE
@@ -978,11 +1078,7 @@ class ProformaAutoComplete(APIView):
                 # AJOUTER LE FOURNISSEUR
                 # ==========================================
 
-                client_data["client"] = (
-                    ClientsSerializers(p_obj).data
-                    if p_obj
-                    else None
-                )
+                client_data["client"] = ClientsSerializers(p_obj).data if p_obj else []
 
                 # ==========================================
                 # AJOUTER LES LIGNES
@@ -1006,6 +1102,8 @@ class ProformaAutoComplete(APIView):
                             "prol_cli_code": ligne.prol_cli_code,
                             "prol_totalttc": ligne.prol_totalttc,
                             "prol_pri_id": ligne.prol_id,
+                            "prol_lot_id": ligne.prol_lot_id,
+                            "prol_lot_dateper": ligne.prol_lot_dateper,
                             # Informations de l'article
                             "art_nom": (article.art_nom if article else ""),
                         }

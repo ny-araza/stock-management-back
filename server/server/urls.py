@@ -78,7 +78,16 @@ urlpatterns = [
         views.CFAutoComplete.as_view(),
         name="cmf-fournis-autocomplete",
     ),
-
+    path(
+        "api/proforma/<int:pro_id>/update/",
+        views.UpdateProformaView.as_view(),
+        name="update-proforma",
+    ),
+    path(
+        "api/cmf-fournis/<int:cmf_id>/update/",
+        views.UpdateCmfView.as_view(),
+        name="update-cmf",
+    ),
     path(
         "api/proforma-autocomplete/",
         views.ProformaAutoComplete.as_view(),
