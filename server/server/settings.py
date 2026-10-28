@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -8,13 +9,30 @@ SECRET_KEY = "django-insecure-&ku=cep^1)yxw*33mxp%=)\
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:5174", "http://localhost:5173"]
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",  # ajoute aussi cette variante, souvent nécessaire
-]
+def _env_list(name, default_values):
+    value = os.environ.get(name)
+    if not value:
+        return default_values
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+ALLOWED_HOSTS = _env_list(
+    "ALLOWED_HOSTS",
+    ["localhost", "127.0.0.1", "0.0.0.0", "backend", "host.docker.internal"],
+)
+
+CORS_ALLOWED_ORIGINS = _env_list(
+    "CORS_ALLOWED_ORIGINS",
+    ["http://localhost:5174", "http://localhost:5173"],
+)
+CSRF_TRUSTED_ORIGINS = _env_list(
+    "CSRF_TRUSTED_ORIGINS",
+    [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+)
 CORS_ALLOW_CREDENTIALS = True
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -116,10 +134,11 @@ WSGI_APPLICATION = "server.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "db_baby",
-        "HOST": "localhost",
-        "USER": "root",
-        "PASSWORD": "root",
+        "NAME": os.environ.get("DB_NAME", "db_baby"),
+        "HOST": os.environ.get("DB_HOST", "localhost"),
+        "USER": os.environ.get("DB_USER", "root"),
+        "PASSWORD": os.environ.get("DB_PASSWORD", "root"),
+        "PORT": os.environ.get("DB_PORT", "3306"),
         # supprimmer si pas poste 42
         # 'OPTIONS': {
         #     'unix_socket': '/home/ny-araza/goinfre/mysql/mysql.sock'
