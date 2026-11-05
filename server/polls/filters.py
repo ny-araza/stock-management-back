@@ -1,6 +1,6 @@
+import django_filters
 from django.db import models
 from django_filters import rest_framework as filters
-import django_filters
 
 from .models import (
     TArticle,
@@ -53,66 +53,77 @@ class ClientFilter(filters.FilterSet):
         }
 
 
-class VenteFilter(filters.FilterSet):
-    vte_valide = filters.NumberFilter()
-    vte_paye = filters.NumberFilter()
-    vte_datecre_year = filters.NumberFilter(
-        field_name="vte_datecre", lookup_expr="year"
-    )
-    vte_datecre_month = filters.NumberFilter(
-        field_name="vte_datecre", lookup_expr="month"
+import django_filters
+from django.db.models import Q
+
+from .models import TVente
+
+
+class VenteFilter(django_filters.FilterSet):
+    # Recherche globale
+    search = django_filters.CharFilter(method="filter_search", label="Recherche")
+
+    # Recherche par client
+    client = django_filters.CharFilter(
+        field_name="vte_cli_nom", lookup_expr="icontains"
     )
 
-    vte_datemd_year = filters.NumberFilter(field_name="vte_datemd", lookup_expr="year")
-    vte_datemd_month = filters.NumberFilter(
-        field_name="vte_datemd", lookup_expr="month"
+    # Recherche par code client
+    cli_code = django_filters.CharFilter(
+        field_name="vte_cli_code", lookup_expr="icontains"
     )
 
-    vte_datevalide_year = filters.NumberFilter(
-        field_name="vte_datevalide", lookup_expr="year"
+    # Recherche par code vente
+    code = django_filters.CharFilter(field_name="vte_code", lookup_expr="icontains")
+
+    # Période de vente
+    date_debut = django_filters.DateFilter(field_name="vte_date", lookup_expr="gte")
+
+    date_fin = django_filters.DateFilter(field_name="vte_date", lookup_expr="lte")
+
+    # Statut de paiement
+    paye = django_filters.NumberFilter(field_name="vte_paye")
+
+    # Statut de validation
+    valide = django_filters.NumberFilter(field_name="vte_valide")
+
+    # Mode de paiement
+    mode_paye = django_filters.CharFilter(
+        field_name="vte_modepaye", lookup_expr="icontains"
     )
-    vte_datevalide_month = filters.NumberFilter(
-        field_name="vte_datevalide", lookup_expr="month"
+    paye_client = django_filters.CharFilter(
+        field_name="vte_payeclient", lookup_expr="icontains"
+    )
+    # Opérateur
+    operateur = django_filters.CharFilter(
+        field_name="vet_operateur", lookup_expr="icontains"
     )
 
-    vte_datepay_year = filters.NumberFilter(
-        field_name="vte_datepay", lookup_expr="year"
-    )
-    vte_datepay_month = filters.NumberFilter(
-        field_name="vte_datepay", lookup_expr="month"
-    )
-
-    ve_dateecheance_year = filters.NumberFilter(
-        field_name="ve_dateecheance", lookup_expr="year"
-    )
-    ve_dateecheance_month = filters.NumberFilter(
-        field_name="ve_dateecheance", lookup_expr="month"
-    )
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(vte_code__icontains=value)
+            | Q(vte_cli_nom__icontains=value)
+            | Q(vte_cli_code__icontains=value)
+            | Q(vte_cli_contact__icontains=value)
+            | Q(vte_payeclient__icontains=value)
+            | Q(vet_operateur__icontains=value)
+            | Q(ve_code_bl__icontains=value)
+        )
 
     class Meta:
         model = TVente
-        exclude = [
-            "vte_id",
-            "ve_proforma",
-            "ve_remise",
+        fields = [
+            "date_debut",
+            "date_fin",
+            "paye",
+            "valide",
+            "mode_paye",
+            "paye_client",
+            "operateur",
+            "client",
+            "cli_code",
+            "code",
         ]
-
-        filter_overrides = {
-            models.CharField: {
-                "filter_class": filters.CharFilter,
-                "extra": lambda f: {"lookup_expr": "icontains"},
-            },
-            models.DecimalField: {
-                "filter_class": filters.NumberFilter,
-            },
-            models.DateField: {
-                "filter_class": filters.DateFilter,
-            },
-            models.DateTimeField: {
-                "filter_class": filters.DateFilter,
-                "extra": lambda f: {"lookup_expr": "date"},
-            },
-        }
 
 
 class BcFilter(filters.FilterSet):
@@ -323,6 +334,7 @@ class RtfFilter(filters.FilterSet):
             },
         }
 
+
 class RtcFilter(filters.FilterSet):
     rtc_enabled = filters.NumberFilter()
     rtc_datecre_year = filters.NumberFilter(
@@ -361,6 +373,7 @@ class RtcFilter(filters.FilterSet):
                 "extra": lambda f: {"lookup_expr": "date"},
             },
         }
+
 
 class SortitFilter(filters.FilterSet):
     out_enabled = filters.NumberFilter()
@@ -480,6 +493,7 @@ class MvtStockFilter(filters.FilterSet):
                 "extra": lambda f: {"lookup_expr": "date"},
             },
         }
+
 
 class MvtStockFilterr(django_filters.FilterSet):
     class Meta:

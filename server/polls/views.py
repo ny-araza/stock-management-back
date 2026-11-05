@@ -388,6 +388,34 @@ class VenteViewSet(viewsets.GenericViewSet):
         except Exception as e:
             return Response({"status": False, "message": str(e), "ventes": []})
 
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            vente = self.get_object()
+    
+            serializer = self.get_serializer(vente)
+            data = serializer.data
+    
+            lignes = TLigneVente.objects.filter(
+                vtel_vte_code=vente.vte_code
+            )
+    
+            data["lignes"] = LigneVenteSerializer(
+                lignes,
+                many=True
+            ).data
+    
+            return Response({
+                "status": True,
+                "message": "Vente récupérée avec succès",
+                "vente": data,
+            })
+    
+        except Exception as e:
+            return Response({
+                "status": False,
+                "message": str(e),
+            }, status=500)
+
 
 # liste BC
 class BcViewSet(viewsets.GenericViewSet):
@@ -814,6 +842,90 @@ class ArticleAutoComplete(APIView):
             return Response({"status": False, "message": str(e), "articles": []})
 
 
+class ExpiredArticlesStock(APIView):
+    """
+    Retourne, pour chaque article ayant des lots périmés :
+    - le total périmé de l'article
+    - le détail des lots périmés
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            today = timezone.now().date()
+
+            # Tous les lots périmés avec du stock restant
+            lots = list(
+                TLot.objects.filter(
+                    lot_dateper__lte=today,
+                    lot_art_quantite__gt=0,
+                ).values(
+                    "lot_id",
+                    "lot_art_code",
+                    "lot_code",
+                    "lot_dateper",
+                    "lot_art_quantite",
+                )
+            )
+
+            if not lots:
+                return Response({"status": True, "articles": []})
+
+            codes = list({lot["lot_art_code"] for lot in lots})
+
+            # Noms des articles
+            articles_dict = {
+                a["art_code"]: a["art_nom"]
+                for a in TArticle.objects.filter(art_code__in=codes).values(
+                    "art_code", "art_nom"
+                )
+            }
+
+            # Un prix par article (le premier trouvé)
+            prix_dict = {}
+            for p in TPrix.objects.filter(pri_art_code__in=codes).values(
+                "pri_id", "pri_art_code", "pri_achat", "pri_vte", "pri_tva"
+            ):
+                prix_dict.setdefault(p["pri_art_code"], p)
+
+            # Regroupement des lots par article + total périmé
+            grouped = {}
+            for lot in lots:
+                code = lot["lot_art_code"]
+                grouped.setdefault(code, {"total": 0, "lots": []})
+                grouped[code]["total"] += lot["lot_art_quantite"] or 0
+                grouped[code]["lots"].append(
+                    {
+                        "lot_id": lot["lot_id"],
+                        "lot_code": lot["lot_code"],
+                        "lot_datePeremption": lot["lot_dateper"],
+                        "lot_quantite": lot["lot_art_quantite"],
+                    }
+                )
+
+            result = []
+            for code, data in grouped.items():
+                prix = prix_dict.get(code, {})
+                result.append(
+                    {
+                        "id": prix.get("pri_id", 0),
+                        "code": code,
+                        "nom_article": articles_dict.get(code, ""),
+                        "prix_ht": prix.get("pri_achat", 0),
+                        "prix_vte": prix.get("pri_vte", 0),
+                        "pri_tva": prix.get("pri_tva", 0),
+                        "quantite_perimee": data["total"],
+                        "lots": data["lots"],
+                    }
+                )
+
+            return Response({"status": True, "articles": result})
+
+        except Exception as e:
+            return Response({"status": False, "message": str(e), "articles": []})
+
+
 class UpdateCmfView(APIView):
     def patch(self, request, cmf_id):
         try:
@@ -967,6 +1079,108 @@ class CFAutoComplete(APIView):
         except Exception as e:
             return Response({"status": False, "message": str(e), "cmf_fournis": []})
 
+
+class RTCAutoComplete(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            search = request.GET.get("search", "").strip()
+
+            if not search:
+                return Response({"status": True, "ventes": []})
+
+            # Récupérer les 30 commandes fournisseurs correspondantes
+            ventes = TVente.objects.filter(
+                vte_code__icontains=search, vte_paye=False
+            ).order_by(
+                Case(
+                    When(vte_code__istartswith=search, then=0),
+                    default=1,
+                    output_field=IntegerField(),
+                ),
+                "vte_code",
+            )[:30]
+
+            result = []
+
+            for vente in ventes:
+                # ==========================================
+                # LIGNES DE LA COMMANDE
+                # ==========================================
+
+                lignes = TLigneVente.objects.filter(
+                    vtel_vte_code=vente.vte_code
+                )
+
+                # Récupérer les codes articles
+                art_codes = [
+                    ligne.vtel_art_code for ligne in lignes if ligne.vtel_art_code
+                ]
+
+                # Récupérer les articles
+                articles = TArticle.objects.filter(art_code__in=art_codes)
+
+                # Dictionnaire des articles
+                articles_dict = {article.art_code: article for article in articles}
+
+                # ==========================================
+                # INFORMATIONS DU FOURNISSEUR
+                # ==========================================
+
+                client_obj = TClient.objects.filter(
+                    cli_code=vente.vte_cli_code
+                ).first()
+
+                # ==========================================
+                # DONNÉES DE LA COMMANDE
+                # ==========================================
+
+                vente_data = VenteSerializers(vente).data
+
+                # ==========================================
+                # AJOUTER LE FOURNISSEUR
+                # ==========================================
+
+                vente_data["client"] = (
+                    ClientsSerializers(client_obj).data
+                    if client_obj
+                    else None
+                )
+
+                # ==========================================
+                # AJOUTER LES LIGNES
+                # ==========================================
+
+                vente_data["ligne"] = []
+
+                for ligne in lignes:
+                    article = articles_dict.get(ligne.vtel_art_code)
+
+                    vente_data["ligne"].append(
+                        {
+                            "vtel_rtc_code": ligne.vtel_rtc_code,
+                            "vtel_Quantite": ligne.vtel_quantite,
+                            "vtel_PrixAchat": ligne.vtel_prixachat,
+                            "vtel_Tva": ligne.vtel_tva,
+                            "vtel_montant_tva": (ligne.vtel_tva / 100)
+                            * (ligne.vtel_totalht),
+                            "vtel_TotalHT": ligne.vtel_totalht,
+                            "vtel_Art_Code": ligne.vtel_art_code,
+                            "vtel_fou_Code": ligne.vtel_fou_code,
+                            "vtel_TotalTTC": ligne.vtel_totalttc,
+                            "vtel_pri_id": ligne.vtel_id,
+                            # Informations de l'article
+                            "art_nom": (article.art_nom if article else ""),
+                        }
+                    )
+
+                result.append(vente_data)
+
+            return Response({"status": True, "ventes": result})
+
+        except Exception as e:
+            return Response({"status": False, "message": str(e), "ventes": []})
 
 class UpdateProformaView(APIView):
     def patch(self, request, pro_id):
@@ -1128,7 +1342,10 @@ class BLAutoComplete(APIView):
                 return Response({"status": True, "t_entree": []})
 
             # Récupérer les 30 commandes fournisseurs correspondantes
-            entree = TEntree.objects.filter(ent_code__icontains=search).order_by(
+            entree = TEntree.objects.filter(
+                ent_code__icontains=search,
+                
+            ).order_by(
                 Case(
                     When(ent_code__istartswith=search, then=0),
                     default=1,
@@ -1193,17 +1410,21 @@ class BLAutoComplete(APIView):
                     fournisseur_data["ligne"].append(
                         {
                             "entl_cmf_code": ligne.entl_ent_code,
-                            "entl_Quantite": ligne.entl_quantite,
-                            "entl_PrixAchat": ligne.entl_prix,
-                            "entl_Tva": ligne.entl_tva,
-                            "entl_TotalHT": ligne.entl_ht,
-                            "entl_Art_Code": ligne.entl_art_code,
+                            "entl_quantite": ligne.entl_quantite,
+                            "entl_prixunit": ligne.entl_prix,
+                            "entl_tva": ligne.entl_tva,
+                            "entl_ht": ligne.entl_ht,
+                            "entl_art_code": ligne.entl_art_code,
                             "entl_fou_Code": ligne.entl_fou_code,
-                            "entl_TotalTTC": ligne.entl_ttc,
+                            "entl_ttc": ligne.entl_ttc,
                             "entl_pri_id": ligne.entl_id,
                             "entl_dateper": ligne.entl_dateper,
+                            "entl_montant_tva": (ligne.entl_tva / 100) * (ligne.entl_ht),
                             # Informations de l'article
                             "art_nom": (article.art_nom if article else ""),
+                            "entl_lot_id": ligne.entl_lot,
+                            "entl_remise": ligne.entl_remise,
+                            "entl_montant_remise": (ligne.entl_remise / 100) * ligne.entl_ht,
                         }
                     )
 
@@ -1226,7 +1447,10 @@ class FAAutoComplete(APIView):
                 return Response({"status": True, "t_vente": []})
 
             # Récupérer les 30 commandes fournisseurs correspondantes
-            entree = TVente.objects.filter(vte_code__icontains=search).order_by(
+            entree = TVente.objects.filter(
+                vte_code__icontains=search,
+                vte_valide=True
+            ).order_by(
                 Case(
                     When(vte_code__istartswith=search, then=0),
                     default=1,
@@ -1288,17 +1512,19 @@ class FAAutoComplete(APIView):
                     article = articles_dict.get(ligne.vtel_art_code)
                     fournisseur_data["ligne"].append(
                         {
-                            "vtel_cmf_code": ligne.vtel_vte_code,
-                            "vtel_Quantite": ligne.vtel_quantite,
-                            "vtel_Tva": ligne.vtel_tva,
-                            "vtel_TotalHT": ligne.vtel_ht,
-                            "vtel_Art_Code": ligne.vtel_art_code,
-                            "vtel_fou_Code": ligne.vtel_cli_code,
-                            "vtel_TotalTTC": ligne.vtel_ttc,
-                            "vtel_pri_unit": ligne.vtel_prixunit,
-                            "vtel_lot_code": ligne.vtel_lot_code,
+                            "vtel_vte_code": ligne.vtel_vte_code,
+                            "vtel_quantite": ligne.vtel_quantite,
+                            "vtel_tva": ligne.vtel_tva,
+                            "vtel_ht": ligne.vtel_ht,
+                            "vtel_art_code": ligne.vtel_art_code,
+                            "vtel_cli_code": ligne.vtel_cli_code,
+                            "vtel_ttc": ligne.vtel_ttc,
+                            "vtel_prixunit": ligne.vtel_prixunit,
+                            "vtel_lot_code": ligne.vtel_lot_id,
                             "vtel_dateper": ligne.vtel_lot_dateper,
                             "vtel_pri_id": ligne.vtel_pri_id,
+                            "vtel_montant_tva": (ligne.vtel_tva / 100)
+                            * (ligne.vtel_ht),
                             # Informations de l'article
                             "art_nom": (article.art_nom if article else ""),
                         }
@@ -1959,6 +2185,7 @@ class LotViewSet(viewsets.ViewSet):
         lot_id = request.data.get("lot_id")
         art_code = request.data.get("art_code")
         quantite = request.data.get("quantite")
+        op = request.data.get("op", "sortie")
 
         print(lot_id, art_code, quantite)
 
@@ -1976,7 +2203,7 @@ class LotViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if quantite <= 0:
+        if quantite < 0:
             return Response(
                 {"error": "La quantité doit être supérieure à 0."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -2003,8 +2230,10 @@ class LotViewSet(viewsets.ViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        lot.lot_art_quantite = ancienne_quantite - quantite
+        if op == "sortie":
+            lot.lot_art_quantite = ancienne_quantite - quantite
+        else:
+            lot.lot_art_quantite = ancienne_quantite + quantite
         lot.save(update_fields=["lot_art_quantite"])
 
         return Response(

@@ -4,6 +4,7 @@ from polls import views
 from polls.vente.views import ValiderVenteView
 from rest_framework.routers import DefaultRouter
 
+
 router = DefaultRouter()
 
 router.register(r"users", views.TUserViewset)
@@ -99,6 +100,8 @@ urlpatterns = [
     path(
         "api/fa-autocomplete/", views.FAAutoComplete.as_view(), name="fa-autocomplete"
     ),
+    
     path("api/vente/valider/", ValiderVenteView.as_view(), name="valider-vente"),
+    path("api/articles-perimes/", views.ExpiredArticlesStock.as_view(), name="articles-perimes"),
     path("", include("polls.urls_auth")),
 ]
