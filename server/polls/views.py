@@ -17,7 +17,7 @@ from django.db.models import (
 from django.utils import timezone
 from django.utils.regex_helper import get_quantifier
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action, api_view
 from rest_framework.filters import OrderingFilter
@@ -418,7 +418,12 @@ class VenteViewSet(viewsets.GenericViewSet):
 
 
 # liste BC
-class BcViewSet(viewsets.GenericViewSet):
+class BcViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
     permission_classes = [IsAuthenticated]
     authentication_classes = [SessionAuthentication]
 
@@ -435,10 +440,8 @@ class BcViewSet(viewsets.GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-
             queryset = self.filter_queryset(self.get_queryset())
             queryset = queryset.order_by("-cmf_datecre")
-
 
             page = self.paginate_queryset(queryset)
 
@@ -481,13 +484,11 @@ class BcViewSet(viewsets.GenericViewSet):
                 commande_id = commande["cmf_code"]
                 commande["ligne"] = lignes_par_commande.get(commande_id, [])
                 fournisseur = TFournis.objects.filter(
-                        fou_code=commande["cmf_fou_code"]
-                    ).first()
-                
+                    fou_code=commande["cmf_fou_code"]
+                ).first()
+
                 commande["fournisseur"] = (
-                    FournisseurSerializers(fournisseur).data
-                    if fournisseur
-                    else None
+                    FournisseurSerializers(fournisseur).data if fournisseur else None
                 )
             # Réponse paginée
             if page is not None:
@@ -531,9 +532,7 @@ class BcViewSet(viewsets.GenericViewSet):
             data = serializer.data
 
             # Récupérer toutes les lignes liées au bon de commande
-            lignes = TLigneCmdFournis.objects.filter(
-                cmfl_cmf_code=commande.cmf_code
-            )
+            lignes = TLigneCmdFournis.objects.filter(cmfl_cmf_code=commande.cmf_code)
 
             # Construire la liste des articles
             lignes_data = []
@@ -556,12 +555,17 @@ class BcViewSet(viewsets.GenericViewSet):
 
             # Ajouter les lignes au bon de commande
             data["ligne"] = lignes_data
+            fournisseur = TFournis.objects.filter(fou_code=data["cmf_fou_code"]).first()
+
+            data["fournisseur"] = (
+                FournisseurSerializers(fournisseur).data if fournisseur else None
+            )
 
             return Response(
                 {
                     "status": True,
                     "message": "Bon de commande récupéré avec succès",
-                    "commande": data,
+                    "commandes": data,
                 }
             )
 
@@ -572,6 +576,92 @@ class BcViewSet(viewsets.GenericViewSet):
                     "message": str(e),
                 },
                 status=500,
+            )
+
+    def update(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                commande = self.get_object()
+
+                # Récupérer les lignes envoyées par React
+                data = request.data.copy()
+                lignes_data = data.pop("ligne", None)
+
+                # Modifier les informations principales du BC
+                serializer = self.get_serializer(commande, data=data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+
+                # Modifier les lignes uniquement si elles sont présentes
+                if lignes_data is not None:
+                    lignes_ids = []
+
+                    for ligne_data in lignes_data:
+                        ligne_id = ligne_data.get("cmfl_id")
+
+                        valeurs = {
+                            "cmfl_cmf_id": commande.cmf_id,
+                            "cmfl_cmf_code": commande.cmf_code,
+                            "cmfl_quantite": ligne_data.get("cmfl_Quantite", 0),
+                            "cmfl_prixachat": ligne_data.get("cmfl_PrixAchat", 0),
+                            "cmfl_tva": ligne_data.get("cmfl_Tva", 0),
+                            "cmfl_totalht": ligne_data.get("cmfl_TotalHT", 0),
+                            "cmfl_art_code": ligne_data.get("cmfl_Art_Code"),
+                            "cmfl_fou_code": ligne_data.get(
+                                "cmfl_fou_Code", commande.cmf_fou_code
+                            ),
+                            "cmfl_totalttc": ligne_data.get("cmfl_TotalTTC", 0),
+                            "cmfl_pri_id": ligne_data.get("cmfl_pri_id"),
+                        }
+
+                        if ligne_id:
+                            # Modifier une ligne existante
+                            ligne = TLigneCmdFournis.objects.filter(
+                                cmfl_id=ligne_id,
+                                cmfl_cmf_code=commande.cmf_code,
+                            ).first()
+
+                            if not ligne:
+                                return Response(
+                                    {
+                                        "status": False,
+                                        "message": f"Ligne {ligne_id} introuvable.",
+                                    },
+                                    status=status.HTTP_404_NOT_FOUND,
+                                )
+
+                            for champ, valeur in valeurs.items():
+                                setattr(ligne, champ, valeur)
+
+                            ligne.save()
+                            lignes_ids.append(ligne.cmfl_id)
+
+                        else:
+                            # Ajouter une nouvelle ligne
+                            nouvelle_ligne = TLigneCmdFournis.objects.create(**valeurs)
+                            lignes_ids.append(nouvelle_ligne.cmfl_id)
+
+                    # Supprimer les anciennes lignes retirées du formulaire
+                    TLigneCmdFournis.objects.filter(
+                        cmfl_cmf_code=commande.cmf_code
+                    ).exclude(cmfl_id__in=lignes_ids).delete()
+
+                return Response(
+                    {
+                        "status": True,
+                        "message": "Bon de commande modifié avec succès.",
+                        "commandes": serializer.data,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+        except Exception as e:
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
 
