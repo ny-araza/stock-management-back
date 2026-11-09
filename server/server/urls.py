@@ -90,6 +90,11 @@ urlpatterns = [
         name="update-cmf",
     ),
     path(
+        "api/update-vente/<int:vte_id>/update/",
+        views.UpdateVente.as_view(),
+        name="update-vente",
+    ),
+    path(
         "api/proforma-autocomplete/",
         views.ProformaAutoComplete.as_view(),
         name="proforma-autocomplete",

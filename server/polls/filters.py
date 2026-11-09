@@ -126,53 +126,39 @@ class VenteFilter(django_filters.FilterSet):
         ]
 
 
+import django_filters as filters
+from django.db import models
+from django.db.models import Q
+
+
 class BcFilter(filters.FilterSet):
-    cmf_isLivre = filters.NumberFilter()
-    cmf_enabled = filters.NumberFilter()
-    cmf_datecre_year = filters.NumberFilter(
-        field_name="cmf_datecre", lookup_expr="year"
-    )
-    cmf_datecre_month = filters.NumberFilter(
-        field_name="cmf_datecre", lookup_expr="month"
+    # Recherche par code commande ou fournisseur
+    search = filters.CharFilter(method="filter_search")
+
+    # Dates
+    date_debut = filters.DateFilter(field_name="cmf_date", lookup_expr="gte")
+
+    date_fin = filters.DateFilter(field_name="cmf_date", lookup_expr="lte")
+
+    # Mode de commande
+    mode_cmd = filters.CharFilter(field_name="cmf_modecmd", lookup_expr="exact")
+
+    # Statut de livraison
+    is_livre = filters.BooleanFilter(
+        field_name="cmf_islivre", method="filter_livraison"
     )
 
-    cmf_datemd_year = filters.NumberFilter(field_name="cmf_datemdf", lookup_expr="year")
-    cmf_datemd_month = filters.NumberFilter(
-        field_name="cmf_datemdf", lookup_expr="month"
-    )
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(cmf_code__icontains=value) | Q(cmf_fou_code__icontains=value)
+        )
 
-    cmf_dateliv_year = filters.NumberFilter(
-        field_name="cmf_dateliv", lookup_expr="year"
-    )
-    cmf_dateliv_month = filters.NumberFilter(
-        field_name="cmf_dateliv", lookup_expr="month"
-    )
-
-    cmf_date_year = filters.NumberFilter(field_name="cmf_date", lookup_expr="year")
-    cmf_date_month = filters.NumberFilter(field_name="cmf_date", lookup_expr="month")
+    def filter_livraison(self, queryset, name, value):
+        return queryset.filter(cmf_islivre=1 if value else 0)
 
     class Meta:
         model = TCmdFournis
-        exclude = [
-            "cmf_id",
-        ]
-
-        filter_overrides = {
-            models.CharField: {
-                "filter_class": filters.CharFilter,
-                "extra": lambda f: {"lookup_expr": "icontains"},
-            },
-            models.DecimalField: {
-                "filter_class": filters.NumberFilter,
-            },
-            models.DateField: {
-                "filter_class": filters.DateFilter,
-            },
-            models.DateTimeField: {
-                "filter_class": filters.DateFilter,
-                "extra": lambda f: {"lookup_expr": "date"},
-            },
-        }
+        fields = []
 
 
 class FournisseurFilter(filters.FilterSet):

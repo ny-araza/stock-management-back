@@ -8,12 +8,16 @@ SECRET_KEY = "django-insecure-&ku=cep^1)yxw*33mxp%=)\
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "localhost",
+    "10.131.84.5"
+]
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:5174", "http://localhost:5173"]
+CORS_ALLOWED_ORIGINS = ["http://localhost:5174", "http://localhost:5173", "http://10.131.84.5:5173"]
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
-    "http://127.0.0.1:5173",  # ajoute aussi cette variante, souvent nécessaire
+    "http://127.0.0.1:5173", 
+   "http://10.131.84.5:5173" # ajoute aussi cette variante, souvent nécessaire
 ]
 CORS_ALLOW_CREDENTIALS = True
 REST_FRAMEWORK = {

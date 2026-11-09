@@ -391,40 +391,41 @@ class VenteViewSet(viewsets.GenericViewSet):
     def retrieve(self, request, *args, **kwargs):
         try:
             vente = self.get_object()
-    
+
             serializer = self.get_serializer(vente)
             data = serializer.data
-    
-            lignes = TLigneVente.objects.filter(
-                vtel_vte_code=vente.vte_code
+
+            lignes = TLigneVente.objects.filter(vtel_vte_code=vente.vte_code)
+
+            data["lignes"] = LigneVenteSerializer(lignes, many=True).data
+
+            return Response(
+                {
+                    "status": True,
+                    "message": "Vente récupérée avec succès",
+                    "vente": data,
+                }
             )
-    
-            data["lignes"] = LigneVenteSerializer(
-                lignes,
-                many=True
-            ).data
-    
-            return Response({
-                "status": True,
-                "message": "Vente récupérée avec succès",
-                "vente": data,
-            })
-    
+
         except Exception as e:
-            return Response({
-                "status": False,
-                "message": str(e),
-            }, status=500)
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                },
+                status=500,
+            )
 
 
 # liste BC
 class BcViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
     authentication_classes = [SessionAuthentication]
+
     queryset = TCmdFournis.objects.all()
     serializer_class = BcSerializers
     pagination_class = ListPagination
-    # Activation des filtres et du tri
+
     filter_backends = [
         DjangoFilterBackend,
         OrderingFilter,
@@ -434,18 +435,62 @@ class BcViewSet(viewsets.GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            # queryset = self.get_queryset()
-            queryset = self.filter_queryset(self.get_queryset())
-            search = request.query_params.get("search", "").strip()
 
-            if search:
-                for word in search.split():
-                    queryset = queryset.filter(Q(cmf_code__icontains=search))
+            queryset = self.filter_queryset(self.get_queryset())
             queryset = queryset.order_by("-cmf_datecre")
+
+
             page = self.paginate_queryset(queryset)
 
             if page is not None:
-                serializer = self.get_serializer(page, many=True)
+                commandes = page
+            else:
+                commandes = queryset
+
+            serializer = self.get_serializer(commandes, many=True)
+            bc_list = serializer.data
+
+            # Récupérer les IDs des bons de commande
+            commande_ids = [commande.cmf_code for commande in commandes]
+            # Récupérer toutes les lignes associées en une seule requête
+            lignes = TLigneCmdFournis.objects.filter(cmfl_cmf_code__in=commande_ids)
+            # Organiser les lignes par ID du bon de commande
+            lignes_par_commande = {}
+
+            for ligne in lignes:
+                commande_id = ligne.cmfl_cmf_code
+                if commande_id not in lignes_par_commande:
+                    lignes_par_commande[commande_id] = []
+
+                lignes_par_commande[commande_id].append(
+                    {
+                        "cmfl_id": ligne.cmfl_id,
+                        "cmfl_cmf_code": ligne.cmfl_cmf_code,
+                        "cmfl_Quantite": ligne.cmfl_quantite,
+                        "cmfl_PrixAchat": ligne.cmfl_prixachat,
+                        "cmfl_Tva": ligne.cmfl_tva,
+                        "cmfl_TotalHT": ligne.cmfl_totalht,
+                        "cmfl_Art_Code": ligne.cmfl_art_code,
+                        "cmfl_fou_Code": ligne.cmfl_fou_code,
+                        "cmfl_TotalTTC": ligne.cmfl_totalttc,
+                        "cmfl_pri_id": ligne.cmfl_pri_id,
+                    }
+                )
+            # Ajouter les lignes à chaque bon de commande
+            for commande in bc_list:
+                commande_id = commande["cmf_code"]
+                commande["ligne"] = lignes_par_commande.get(commande_id, [])
+                fournisseur = TFournis.objects.filter(
+                        fou_code=commande["cmf_fou_code"]
+                    ).first()
+                
+                commande["fournisseur"] = (
+                    FournisseurSerializers(fournisseur).data
+                    if fournisseur
+                    else None
+                )
+            # Réponse paginée
+            if page is not None:
                 return Response(
                     {
                         "status": True,
@@ -455,20 +500,79 @@ class BcViewSet(viewsets.GenericViewSet):
                         "current_page": self.paginator.page.number,
                         "next": self.paginator.get_next_link(),
                         "previous": self.paginator.get_previous_link(),
-                        "bc_list": serializer.data,
+                        "commandes": bc_list,
                     }
                 )
 
-            serializer = self.get_serializer(queryset, many=True)
             return Response(
                 {
                     "status": True,
                     "message": "ok",
-                    "bc_list": serializer.data,
+                    "commandes": bc_list,
                 }
             )
+
         except Exception as e:
-            return Response({"status": False, "message": str(e), "bc_list": []})
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "commandes": [],
+                }
+            )
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            # Récupérer le bon de commande
+            commande = self.get_object()
+
+            # Sérialiser les informations principales
+            serializer = self.get_serializer(commande)
+            data = serializer.data
+
+            # Récupérer toutes les lignes liées au bon de commande
+            lignes = TLigneCmdFournis.objects.filter(
+                cmfl_cmf_code=commande.cmf_code
+            )
+
+            # Construire la liste des articles
+            lignes_data = []
+
+            for ligne in lignes:
+                lignes_data.append(
+                    {
+                        "cmfl_id": ligne.cmfl_id,
+                        "cmfl_cmf_code": ligne.cmfl_cmf_code,
+                        "cmfl_Quantite": ligne.cmfl_quantite,
+                        "cmfl_PrixAchat": ligne.cmfl_prixachat,
+                        "cmfl_Tva": ligne.cmfl_tva,
+                        "cmfl_TotalHT": ligne.cmfl_totalht,
+                        "cmfl_Art_Code": ligne.cmfl_art_code,
+                        "cmfl_fou_Code": ligne.cmfl_fou_code,
+                        "cmfl_TotalTTC": ligne.cmfl_totalttc,
+                        "cmfl_pri_id": ligne.cmfl_pri_id,
+                    }
+                )
+
+            # Ajouter les lignes au bon de commande
+            data["ligne"] = lignes_data
+
+            return Response(
+                {
+                    "status": True,
+                    "message": "Bon de commande récupéré avec succès",
+                    "commande": data,
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                },
+                status=500,
+            )
 
 
 # liste BC
@@ -1109,9 +1213,7 @@ class RTCAutoComplete(APIView):
                 # LIGNES DE LA COMMANDE
                 # ==========================================
 
-                lignes = TLigneVente.objects.filter(
-                    vtel_vte_code=vente.vte_code
-                )
+                lignes = TLigneVente.objects.filter(vtel_vte_code=vente.vte_code)
 
                 # Récupérer les codes articles
                 art_codes = [
@@ -1128,9 +1230,7 @@ class RTCAutoComplete(APIView):
                 # INFORMATIONS DU FOURNISSEUR
                 # ==========================================
 
-                client_obj = TClient.objects.filter(
-                    cli_code=vente.vte_cli_code
-                ).first()
+                client_obj = TClient.objects.filter(cli_code=vente.vte_cli_code).first()
 
                 # ==========================================
                 # DONNÉES DE LA COMMANDE
@@ -1143,9 +1243,7 @@ class RTCAutoComplete(APIView):
                 # ==========================================
 
                 vente_data["client"] = (
-                    ClientsSerializers(client_obj).data
-                    if client_obj
-                    else None
+                    ClientsSerializers(client_obj).data if client_obj else None
                 )
 
                 # ==========================================
@@ -1181,6 +1279,7 @@ class RTCAutoComplete(APIView):
 
         except Exception as e:
             return Response({"status": False, "message": str(e), "ventes": []})
+
 
 class UpdateProformaView(APIView):
     def patch(self, request, pro_id):
@@ -1223,6 +1322,96 @@ class UpdateProformaView(APIView):
         except TProforma.DoesNotExist:
             return Response(
                 {"error": "Proforma introuvable."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class UpdateVente(APIView):
+    def patch(self, request, vte_id):
+        try:
+            with transaction.atomic():
+                vente = TVente.objects.get(vte_id=vte_id)
+
+                vente.vte_valide = request.data.get("vte_valide", vente.vte_valide)
+                vente.vte_paye = request.data.get("vte_paye", vente.vte_paye)
+                vente.vte_usermdf = request.data.get("vte_usermdf", vente.vte_usermdf)
+                vente.vte_datemdf = timezone.now()
+
+                vente.save(
+                    update_fields=[
+                        "vte_valide",
+                        "vte_paye",
+                        "vte_usermdf",
+                        "vte_datemdf",
+                    ]
+                )
+
+            return Response(
+                {
+                    "message": "vente mise à jour avec succès.",
+                    "vte_id": vente.vte_id,
+                    "vte_valide": vente.vte_valide,
+                    "vte_paye": vente.vte_paye,
+                    "vte_usermdf": vente.vte_usermdf,
+                    "vte_datemdf": vente.vte_datemdf,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except TVente.DoesNotExist:
+            return Response(
+                {"error": "vente introuvable."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class UpdateCF(APIView):
+    def patch(self, request, cmf_id):
+        try:
+            with transaction.atomic():
+                cf = TCmdFournis.objects.get(cmf_id=cmf_id)
+
+                cf.cmf_valide = request.data.get("cmf_is_livre", cf.cmf_is_livre)
+                cf.cmf_paye = request.data.get("cmf_paye", cf.cmf_is_paye)
+                cf.cmf_usermdf = request.data.get("cmf_usermdf", cf.cmf_usermdf)
+                cf.cmf_datemdf = timezone.now()
+
+                cf.save(
+                    update_fields=[
+                        "cmf_valide",
+                        "cmf_paye",
+                        "cmf_usermdf",
+                        "cmf_datemdf",
+                    ]
+                )
+
+            return Response(
+                {
+                    "message": "cf mise à jour avec succès.",
+                    "cmf_id": cf.cmf_id,
+                    "cmf_valide": cf.cmf_valide,
+                    "cmf_paye": cf.cmf_paye,
+                    "cmf_usermdf": cf.cmf_usermdf,
+                    "cmf_datemdf": cf.cmf_datemdf,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except TCmdFournis.DoesNotExist:
+            return Response(
+                {"error": "cf introuvable."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -1344,7 +1533,6 @@ class BLAutoComplete(APIView):
             # Récupérer les 30 commandes fournisseurs correspondantes
             entree = TEntree.objects.filter(
                 ent_code__icontains=search,
-                
             ).order_by(
                 Case(
                     When(ent_code__istartswith=search, then=0),
@@ -1419,12 +1607,14 @@ class BLAutoComplete(APIView):
                             "entl_ttc": ligne.entl_ttc,
                             "entl_pri_id": ligne.entl_id,
                             "entl_dateper": ligne.entl_dateper,
-                            "entl_montant_tva": (ligne.entl_tva / 100) * (ligne.entl_ht),
+                            "entl_montant_tva": (ligne.entl_tva / 100)
+                            * (ligne.entl_ht),
                             # Informations de l'article
                             "art_nom": (article.art_nom if article else ""),
                             "entl_lot_id": ligne.entl_lot,
                             "entl_remise": ligne.entl_remise,
-                            "entl_montant_remise": (ligne.entl_remise / 100) * ligne.entl_ht,
+                            "entl_montant_remise": (ligne.entl_remise / 100)
+                            * ligne.entl_ht,
                         }
                     )
 
@@ -1448,8 +1638,7 @@ class FAAutoComplete(APIView):
 
             # Récupérer les 30 commandes fournisseurs correspondantes
             entree = TVente.objects.filter(
-                vte_code__icontains=search,
-                vte_valide=True
+                vte_code__icontains=search, vte_valide=True
             ).order_by(
                 Case(
                     When(vte_code__istartswith=search, then=0),
