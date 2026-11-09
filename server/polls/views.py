@@ -3,6 +3,7 @@ from datetime import timedelta
 from pickletools import float8
 
 from django.conf import settings
+from django.contrib.postgres.forms.hstore import ValidationError
 from django.db import transaction
 from django.db.models import (
     Case,
@@ -2008,53 +2009,220 @@ class EntreeViewSet(viewsets.ModelViewSet):
     ]
 
     filterset_class = EntreeFilter
+    lookup_field = "ent_id"
+
+    # Champs modifiables d'une ligne d'entrée
+    LIGNE_FIELDS = [
+        "entl_quantite",
+        "entl_prixunit",
+        "entl_ttc",
+        "entl_art_code",
+        "entl_pri_id",
+        "entl_tva",
+        "entl_ht",
+        "entl_lot",
+        "entl_dateper",
+        "entl_prix",
+        "entl_remise",
+        "entl_usermdf",
+    ]
+
+    # ==========================================
+    # CONSTRUCTION DE LA RÉPONSE
+    # ==========================================
+
+    def get_entree_data(self, entree):
+        """
+        Retourne une entrée avec ses lignes et son fournisseur.
+        """
+
+        data = EntreeSerializer(entree).data
+
+        lignes = TLigneEntree.objects.filter(entl_ent_code=entree.ent_code)
+
+        fournisseur = TFournis.objects.filter(fou_code=entree.ent_fou_code).first()
+
+        data["lignes"] = LigneEntreeSerializer(lignes, many=True).data
+
+        data["fournisseur"] = (
+            FournisseurSerializers(fournisseur).data if fournisseur else None
+        )
+
+        return data
+
+    # ==========================================
+    # LIST
+    # ==========================================
 
     def list(self, request, *args, **kwargs):
-        try:
-            queryset = self.filter_queryset(self.get_queryset()).order_by(
-                "-ent_datecre"
-            )
-            page = self.paginate_queryset(queryset)
+        queryset = self.filter_queryset(self.get_queryset()).order_by("-ent_datecre")
 
-            objets = page if page is not None else queryset
-            serializer = self.get_serializer(objets, many=True)
-            data = serializer.data
+        page = self.paginate_queryset(queryset)
 
-            # Récupération des lignes pour chaque entrée
-            for entree in data:
-                lignes = TLigneEntree.objects.filter(entl_ent_code=entree["ent_code"])
+        objets = page if page is not None else queryset
 
-                entree["lignes"] = LigneEntreeSerializer(lignes, many=True).data
+        data = [self.get_entree_data(entree) for entree in objets]
 
-            if page is not None:
-                return Response(
-                    {
-                        "status": True,
-                        "message": "ok",
-                        "count": self.paginator.page.paginator.count,
-                        "total_pages": self.paginator.page.paginator.num_pages,
-                        "current_page": self.paginator.page.number,
-                        "next": self.paginator.get_next_link(),
-                        "previous": self.paginator.get_previous_link(),
-                        "entree": data,
-                    }
-                )
-
+        if page is not None:
             return Response(
                 {
                     "status": True,
                     "message": "ok",
+                    "count": self.paginator.page.paginator.count,
+                    "total_pages": self.paginator.page.paginator.num_pages,
+                    "current_page": self.paginator.page.number,
+                    "next": self.paginator.get_next_link(),
+                    "previous": self.paginator.get_previous_link(),
                     "entree": data,
                 }
             )
-        except Exception as e:
+
+        return Response(
+            {
+                "status": True,
+                "message": "ok",
+                "entree": data,
+            }
+        )
+
+    # ==========================================
+    # RETRIEVE
+    # ==========================================
+
+    def retrieve(self, request, *args, **kwargs):
+        entree = self.get_object()
+
+        return Response(
+            {
+                "status": True,
+                "message": "Entrée fournisseur récupérée avec succès.",
+                "entree": self.get_entree_data(entree),
+            }
+        )
+
+    # ==========================================
+    # UPDATE / PATCH
+    # ==========================================
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", request.method == "PATCH")
+
+        with transaction.atomic():
+            entree = self.get_object()
+
+            data = request.data.copy()
+
+            # Récupérer les lignes envoyées par React
+            lignes_data = data.pop("lignes", None)
+
+            # Ne pas modifier les données calculées ou en lecture seule
+            data.pop("fournisseur", None)
+
+            # Vérifier si l'entrée est déjà payée
+            if entree.ent_is_paye:
+                raise ValidationError("Impossible de modifier une entrée déjà payée.")
+
+            # ======================================
+            # MODIFICATION DE L'ENTRÉE PRINCIPALE
+            # ======================================
+
+            serializer = self.get_serializer(entree, data=data, partial=partial)
+
+            serializer.is_valid(raise_exception=True)
+            entree = serializer.save()
+
+            # ======================================
+            # MODIFICATION DES LIGNES
+            # ======================================
+
+            if lignes_data is not None:
+                if not isinstance(lignes_data, list):
+                    raise ValidationError(
+                        {
+                            "lignes": "Les lignes doivent être envoyées sous forme de liste."
+                        }
+                    )
+
+                ids_envoyes = []
+
+                for ligne_data in lignes_data:
+                    ligne_data = dict(ligne_data)
+
+                    ligne_id = ligne_data.pop("entl_id", None)
+
+                    # Retirer les champs non modifiables
+                    ligne_data.pop("entl_ent_code", None)
+                    ligne_data.pop("entl_fou_code", None)
+                    ligne_data.pop("entl_datecre", None)
+                    ligne_data.pop("entl_usercre", None)
+
+                    champs = {
+                        key: value
+                        for key, value in ligne_data.items()
+                        if key in self.LIGNE_FIELDS
+                    }
+
+                    if ligne_id:
+                        # Vérifier que la ligne appartient bien à cette entrée
+                        try:
+                            ligne = TLigneEntree.objects.get(
+                                entl_id=ligne_id, entl_ent_code=entree.ent_code
+                            )
+                        except TLigneEntree.DoesNotExist:
+                            raise ValidationError(
+                                {
+                                    "lignes": (
+                                        f"La ligne {ligne_id} "
+                                        "n'appartient pas à cette entrée."
+                                    )
+                                }
+                            )
+
+                        for champ, valeur in champs.items():
+                            setattr(ligne, champ, valeur)
+
+                        ligne.entl_ent_code = entree.ent_code
+                        ligne.entl_fou_code = entree.ent_fou_code
+
+                        ligne.save()
+
+                        ids_envoyes.append(ligne.entl_id)
+
+                    else:
+                        # Création d'une nouvelle ligne
+                        nouvelle_ligne = TLigneEntree.objects.create(
+                            entl_ent_code=entree.ent_code,
+                            entl_fou_code=entree.ent_fou_code,
+                            **champs,
+                        )
+
+                        ids_envoyes.append(nouvelle_ligne.entl_id)
+
+                # Supprimer les anciennes lignes absentes du formulaire
+                TLigneEntree.objects.filter(entl_ent_code=entree.ent_code).exclude(
+                    entl_id__in=ids_envoyes
+                ).delete()
+
+            # ======================================
+            # RÉPONSE FINALE
+            # ======================================
+
             return Response(
                 {
-                    "status": False,
-                    "message": str(e),
-                    "entree": [],
-                }
+                    "status": True,
+                    "message": "Entrée fournisseur modifiée avec succès.",
+                    "entree": self.get_entree_data(entree),
+                },
+                status=status.HTTP_200_OK,
             )
+
+    # ==========================================
+    # PARTIAL UPDATE
+    # ==========================================
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return self.update(request, *args, **kwargs)
 
 
 class SortitViewSet(viewsets.ModelViewSet):

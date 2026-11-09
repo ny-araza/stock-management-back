@@ -242,20 +242,44 @@ class ArticleFilter(filters.FilterSet):
 
 
 class EntreeFilter(filters.FilterSet):
-    ent_enabled = filters.NumberFilter()
+    # Recherche globale
+    search = filters.CharFilter(method="filter_search")
+
+    # Filtrage par période
+    date_debut = filters.DateFilter(field_name="ent_date", lookup_expr="gte")
+
+    date_fin = filters.DateFilter(field_name="ent_date", lookup_expr="lte")
+
+    # Mode de paiement
+    mode_paye = filters.CharFilter(field_name="ent_modepaye", lookup_expr="icontains")
+
+    # Date de création
     ent_datecre_year = filters.NumberFilter(
         field_name="ent_datecre", lookup_expr="year"
     )
+
     ent_datecre_month = filters.NumberFilter(
         field_name="ent_datecre", lookup_expr="month"
     )
 
+    # Date de modification
     ent_datemdf_year = filters.NumberFilter(
         field_name="ent_datemdf", lookup_expr="year"
     )
+
     ent_datemdf_month = filters.NumberFilter(
         field_name="ent_datemdf", lookup_expr="month"
     )
+
+    # Recherche globale
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(ent_code__icontains=value)
+            | Q(ent_facture__icontains=value)
+            | Q(ent_fou_code__icontains=value)
+            | Q(ent_cmf_code__icontains=value)
+            | Q(ent_modepaye__icontains=value)
+        )
 
     class Meta:
         model = TEntree
