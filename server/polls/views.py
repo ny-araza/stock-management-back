@@ -956,7 +956,7 @@ class ArticleAutoComplete(APIView):
                 TPrix.objects.filter(
                     Q(pri_art_code__icontains=search)
                     | Q(pri_art_code__in=article_codes)
-                ).values("pri_id", "pri_art_code", "pri_achat", "pri_vte", "pri_tva")
+                ).values("pri_id", "pri_art_code", "pri_achat", "pri_vte", "pri_tva", "pri_unitevente")
             )
 
             if not articles:
@@ -967,7 +967,6 @@ class ArticleAutoComplete(APIView):
                         "articles": [],
                     }
                 )
-
             # Codes des articles trouvés
             codes = list(set(a["pri_art_code"] for a in articles))
 
@@ -986,7 +985,6 @@ class ArticleAutoComplete(APIView):
 
             # Dictionnaire des articles
             articles_dict = {article["art_code"]: article for article in articles_data}
-
             # Récupération de TOUS les lots des articles
             lots = TLot.objects.filter(
                 lot_art_code__in=codes, lot_dateper__gt=timezone.now().date()
@@ -1021,6 +1019,7 @@ class ArticleAutoComplete(APIView):
                             "prix_ht": a["pri_achat"],
                             "prix_vte": a["pri_vte"],
                             "pri_tva": a["pri_tva"],
+                            "pri_unitevente": a["pri_unitevente"],
                             "nom_article": articles_dict.get(a["pri_art_code"], {}).get(
                                 "art_nom", ""
                             ),
