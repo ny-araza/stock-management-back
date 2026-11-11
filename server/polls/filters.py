@@ -346,43 +346,35 @@ class RtfFilter(filters.FilterSet):
 
 
 class RtcFilter(filters.FilterSet):
-    rtc_enabled = filters.NumberFilter()
-    rtc_datecre_year = filters.NumberFilter(
-        field_name="rtc_datecre", lookup_expr="year"
-    )
-    rtc_datecre_month = filters.NumberFilter(
-        field_name="rtc_datecre", lookup_expr="month"
+    search = filters.CharFilter(method="filter_search")
+
+    date_debut = filters.DateFilter(
+        field_name="rtc_date",
+        lookup_expr="gte",
     )
 
-    rtc_datemdf_year = filters.NumberFilter(
-        field_name="rtc_datemdf", lookup_expr="year"
-    )
-    rtc_datemdf_month = filters.NumberFilter(
-        field_name="rtc_datemdf", lookup_expr="month"
+    date_fin = filters.DateFilter(
+        field_name="rtc_date",
+        lookup_expr="lte",
     )
 
     class Meta:
         model = TRetourClient
-        exclude = [
-            "rtc_id",
+        fields = [
+            "search",
+            "date_debut",
+            "date_fin",
         ]
 
-        filter_overrides = {
-            models.CharField: {
-                "filter_class": filters.CharFilter,
-                "extra": lambda f: {"lookup_expr": "icontains"},
-            },
-            models.DecimalField: {
-                "filter_class": filters.NumberFilter,
-            },
-            models.DateField: {
-                "filter_class": filters.DateFilter,
-            },
-            models.DateTimeField: {
-                "filter_class": filters.DateFilter,
-                "extra": lambda f: {"lookup_expr": "date"},
-            },
-        }
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(rtc_code__icontains=value)
+            | Q(rtc_vte_code__icontains=value)
+            | Q(rtc_cli_code__icontains=value)
+            | Q(rtc_cli_nom__icontains=value)
+            | Q(rtc_motif__icontains=value)
+            | Q(rtc_observation__icontains=value)
+        )
 
 
 class SortitFilter(filters.FilterSet):
