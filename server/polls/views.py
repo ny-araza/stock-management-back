@@ -260,24 +260,24 @@ class ClientViewSet(viewsets.GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            # queryset = self.get_queryset()
             queryset = self.filter_queryset(self.get_queryset())
             search = request.query_params.get("search", "").strip()
 
             if search:
+                # Chaque mot doit être trouvé dans au moins un des champs
                 for word in search.split():
                     queryset = queryset.filter(
-                        Q(cli_code__icontains=search)
-                        | Q(cli_nom__icontains=search)
-                        | Q(cli_email__icontains=search)
-                        | Q(cli_tel1__icontains=search)
-                        | Q(cli_tel2__icontains=search)
-                        | Q(cli_adresse__icontains=search)
-                        | Q(cli_nif__icontains=search)
-                        | Q(cli_stat__icontains=search)
-                        | Q(cli_rcs__icontains=search)
-                        | Q(cli_type__icontains=search)
-                        | Q(cli_modepay__icontains=search)
+                        Q(cli_code__icontains=word)
+                        | Q(cli_nom__icontains=word)
+                        | Q(cli_email__icontains=word)
+                        | Q(cli_tel1__icontains=word)
+                        | Q(cli_tel2__icontains=word)
+                        | Q(cli_adresse__icontains=word)
+                        | Q(cli_nif__icontains=word)
+                        | Q(cli_stat__icontains=word)
+                        | Q(cli_rcs__icontains=word)
+                        | Q(cli_type__icontains=word)
+                        | Q(cli_modepay__icontains=word)
                     )
             queryset = queryset.order_by("-cli_datecre")
             page = self.paginate_queryset(queryset)
@@ -306,7 +306,7 @@ class ClientViewSet(viewsets.GenericViewSet):
                 }
             )
         except Exception as e:
-            return Response({"status": False, "message": e, "clients": []})
+            return Response({"status": False, "message": str(e), "clients": []})
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -331,6 +331,61 @@ class ClientViewSet(viewsets.GenericViewSet):
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    # ======================================
+    # MODIFICATION
+    # PUT / PATCH  /api/clients/<cli_id>/
+    # ======================================
+    def update(self, request, *args, **kwargs):
+        try:
+            # PATCH => modification partielle, PUT => complète
+            partial = kwargs.pop("partial", False)
+            instance = self.get_object()
+
+            data = request.data.copy()
+
+            # Le code client est généré par le système : on ne le modifie pas
+            data.pop("cli_code", None)
+            # L'identifiant vient de l'URL, jamais du corps de la requête
+            data.pop("cli_id", None)
+
+            serializer = self.get_serializer(instance, data=data, partial=partial)
+
+            if not serializer.is_valid():
+                return Response(
+                    {
+                        "status": False,
+                        "message": "Erreur de validation",
+                        "errors": serializer.errors,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Traçabilité : qui a modifié et quand
+            # (adapter ou retirer si ces champs n'existent pas dans TClient)
+            serializer.save(
+                cli_usermdf=str(request.user),
+                cli_datemdf=timezone.now(),
+            )
+
+            return Response(
+                {
+                    "status": True,
+                    "message": "Client modifié avec succès",
+                    "client": serializer.data,
+                }
+            )
+        except Http404:
+            return Response(
+                {"status": False, "message": "Client introuvable"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            return Response({"status": False, "message": str(e)})
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return self.update(request, *args, **kwargs)
 
 
 # view vente  list
