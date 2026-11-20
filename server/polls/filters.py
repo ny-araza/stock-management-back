@@ -33,7 +33,7 @@ class ClientFilter(filters.FilterSet):
 
     class Meta:
         model = TClient
-        exclude = ["cli_id", "cli_nif", "cli_stat", "cli_rcs", "cli_type"]
+        exclude = ["cli_id", "cli_nif", "cli_stat", "cli_rcs"]
 
         filter_overrides = {
             models.CharField: {

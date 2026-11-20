@@ -109,4 +109,5 @@ urlpatterns = [
     path("api/vente/valider/", ValiderVenteView.as_view(), name="valider-vente"),
     path("api/articles-perimes/", views.ExpiredArticlesStock.as_view(), name="articles-perimes"),
     path("", include("polls.urls_auth")),
+     path("clients/next-code/", views.get_next_cli_code, name="get_next_cli_code"),
 ]

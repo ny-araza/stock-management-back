@@ -1,6 +1,5 @@
 # from django.shortcuts import render
 from datetime import timedelta
-from pickletools import float8
 
 from django.conf import settings
 from django.contrib.postgres.forms.hstore import ValidationError
@@ -956,7 +955,14 @@ class ArticleAutoComplete(APIView):
                 TPrix.objects.filter(
                     Q(pri_art_code__icontains=search)
                     | Q(pri_art_code__in=article_codes)
-                ).values("pri_id", "pri_art_code", "pri_achat", "pri_vte", "pri_tva", "pri_unitevente")
+                ).values(
+                    "pri_id",
+                    "pri_art_code",
+                    "pri_achat",
+                    "pri_vte",
+                    "pri_tva",
+                    "pri_unitevente",
+                )
             )
 
             if not articles:
@@ -1431,6 +1437,9 @@ class UpdateVente(APIView):
                 vente.vte_valide = request.data.get("vte_valide", vente.vte_valide)
                 vente.vte_paye = request.data.get("vte_paye", vente.vte_paye)
                 vente.vte_usermdf = request.data.get("vte_usermdf", vente.vte_usermdf)
+                vente.vte_is_retour = request.data.get(
+                    "vte_is_retour", vente.vte_is_retour
+                )
                 vente.vte_datemdf = timezone.now()
 
                 vente.save(
@@ -1439,6 +1448,7 @@ class UpdateVente(APIView):
                         "vte_paye",
                         "vte_usermdf",
                         "vte_datemdf",
+                        "vte_is_retour",
                     ]
                 )
 
@@ -1450,6 +1460,7 @@ class UpdateVente(APIView):
                     "vte_paye": vente.vte_paye,
                     "vte_usermdf": vente.vte_usermdf,
                     "vte_datemdf": vente.vte_datemdf,
+                    "vte_is_retour": vente.vte_is_retour,
                 },
                 status=status.HTTP_200_OK,
             )
@@ -2692,4 +2703,35 @@ class LotViewSet(viewsets.ViewSet):
                 "nouvelle_quantite": lot.lot_art_quantite,
             },
             status=status.HTTP_200_OK,
+        )
+
+
+@api_view(["GET"])
+def get_next_cli_code(request):
+    try:
+        # Récupérer le dernier client enregistré
+        dernier_client = TClient.objects.order_by("-cli_id").first()
+
+        if dernier_client and dernier_client.cli_code:
+            dernier_code = dernier_client.cli_code
+
+            # Extraire la partie numérique
+            numero = int("".join(filter(str.isdigit, dernier_code)))
+
+            # Incrémenter
+            nouveau_numero = numero + 1
+        else:
+            nouveau_numero = 1
+
+        # Générer le nouveau code
+        nouveau_code = f"CLI{nouveau_numero:05d}"
+
+        return Response(
+            {"status": True, "cli_code": nouveau_code}, status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {"status": False, "message": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
