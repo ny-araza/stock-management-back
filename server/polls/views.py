@@ -666,6 +666,16 @@ class BcViewSet(
 
 
 # liste BC
+from django.db.models import Q
+from django.utils import timezone
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status, viewsets
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.filters import OrderingFilter
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+
 class FournisseurViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
     authentication_classes = [SessionAuthentication]
@@ -682,14 +692,14 @@ class FournisseurViewSet(viewsets.GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            # queryset = self.get_queryset()
             queryset = self.filter_queryset(self.get_queryset())
             search = request.query_params.get("search", "").strip()
 
             if search:
+                # Chaque mot doit être trouvé dans le code ou le nom
                 for word in search.split():
                     queryset = queryset.filter(
-                        Q(fou_code__icontains=search) | Q(fou_nom__icontains=search)
+                        Q(fou_code__icontains=word) | Q(fou_nom__icontains=word)
                     )
             queryset = queryset.order_by("-fou_datecre")
             page = self.paginate_queryset(queryset)
@@ -719,6 +729,64 @@ class FournisseurViewSet(viewsets.GenericViewSet):
             )
         except Exception as e:
             return Response({"status": False, "message": str(e), "fournisseur": []})
+
+    # ======================================
+    # MODIFICATION
+    # PUT / PATCH  /api/fournisseurs/<fou_id>/
+    # ======================================
+    def update(self, request, *args, **kwargs):
+        try:
+            # PATCH => modification partielle, PUT => complète
+            partial = kwargs.pop("partial", False)
+            instance = self.get_object()
+
+            data = request.data.copy()
+
+            # Le code fournisseur est généré par le système : on ne le modifie pas
+            data.pop("fou_code", None)
+            # L'identifiant vient de l'URL, jamais du corps de la requête
+            data.pop("fou_id", None)
+
+            serializer = self.get_serializer(instance, data=data, partial=partial)
+
+            if not serializer.is_valid():
+                return Response(
+                    {
+                        "status": False,
+                        "message": "Données invalides",
+                        "errors": serializer.errors,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Traçabilité : qui a modifié et quand
+            # (adapter si fou_usermdf / fou_datemdf ont un autre format)
+            serializer.save(
+                fou_usermdf=str(request.user),
+                fou_datemdf=timezone.now(),
+            )
+
+            return Response(
+                {
+                    "status": True,
+                    "message": "Fournisseur modifié avec succès",
+                    "fournisseur": serializer.data,
+                }
+            )
+        except Exception as e:
+            # get_object() lève Http404 si le fournisseur n'existe pas
+            from django.http import Http404
+
+            if isinstance(e, Http404):
+                return Response(
+                    {"status": False, "message": "Fournisseur introuvable"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            return Response({"status": False, "message": str(e)})
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return self.update(request, *args, **kwargs)
 
 
 class FamilleViewSet(viewsets.GenericViewSet):
