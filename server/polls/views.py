@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import (
     Case,
     Exists,
+    F,
     IntegerField,
     OuterRef,
     Q,
@@ -155,7 +156,114 @@ class TUserViewset(viewsets.ModelViewSet):
             return Response({"status": False, "messages": e, "users": []})
 
 
-# Articles views
+# # Articles views
+# class ArticlesViewSet(viewsets.ModelViewSet):
+#     queryset = TArticle.objects.all()
+#     serializer_class = ArticlesSerializers
+#     pagination_class = ListPagination
+#     permission_classes = [IsAuthenticated]
+#     authentication_classes = [SessionAuthentication]
+#
+#     filter_backends = [
+#         DjangoFilterBackend,
+#         OrderingFilter,
+#     ]
+#
+#     filterset_class = ArticleFilter
+#
+#     # ======================================
+#     # PRIX ACTUEL DE CHAQUE ARTICLE
+#     # TArticle et TPrix sont liés par art_code <-> pri_art_code (pas de FK)
+#     # ======================================
+#     def get_queryset(self):
+#         now = timezone.now()
+#
+#         # Prix actif : activé, et dont la période couvre aujourd'hui.
+#         # S'il y en a plusieurs, on prend le plus récent.
+#         prix_actuel = (
+#             TPrix.objects.filter(pri_art_code=OuterRef("art_code"), pri_enabled=1)
+#             .filter(Q(pri_datedeb__isnull=True) | Q(pri_datedeb__lte=now))
+#             .filter(Q(pri_datefin__isnull=True) | Q(pri_datefin__gte=now))
+#             .order_by(F("pri_datedeb").desc(nulls_last=True), "-pri_id")
+#         )
+#
+#         return TArticle.objects.annotate(
+#             pri_achat=Subquery(prix_actuel.values("pri_achat")[:1]),
+#             pri_vte=Subquery(prix_actuel.values("pri_vte")[:1]),
+#             pri_tva=Subquery(prix_actuel.values("pri_tva")[:1]),
+#             pri_unitevente=Subquery(prix_actuel.values("pri_unitevente")[:1]),
+#         )
+#
+#     @staticmethod
+#     def _to_float(value):
+#         return float(value) if value is not None else None
+#
+#     def _serialize_with_prix(self, objects):
+#         """Sérialise les articles et y ajoute prix d'achat, de vente et TVA."""
+#         objects = list(objects)
+#         data = self.get_serializer(objects, many=True).data
+#
+#         result = []
+#         for obj, row in zip(objects, data):
+#             row = dict(row)
+#             row["pri_achat"] = self._to_float(getattr(obj, "pri_achat", None))
+#             row["pri_vte"] = self._to_float(getattr(obj, "pri_vte", None))
+#             row["pri_tva"] = self._to_float(getattr(obj, "pri_tva", None))
+#             row["pri_unitevente"] = getattr(obj, "pri_unitevente", None)
+#             result.append(row)
+#         return result
+#
+#     def list(self, request, *args, **kwargs):
+#         try:
+#             queryset = self.filter_queryset(self.get_queryset())
+#             queryset = queryset.order_by("art_nom")
+#             page = self.paginate_queryset(queryset)
+#
+#             if page is not None:
+#                 return Response(
+#                     {
+#                         "status": True,
+#                         "message": "ok",
+#                         "count": self.paginator.page.paginator.count,
+#                         "total_pages": self.paginator.page.paginator.num_pages,
+#                         "current_page": self.paginator.page.number,
+#                         "next": self.paginator.get_next_link(),
+#                         "previous": self.paginator.get_previous_link(),
+#                         "articles": self._serialize_with_prix(page),
+#                     }
+#                 )
+#
+#             return Response(
+#                 {
+#                     "status": True,
+#                     "message": "ok",
+#                     "articles": self._serialize_with_prix(queryset),
+#                 }
+#             )
+#         except Exception as e:
+#             return Response({"status": False, "message": str(e), "articles": []})
+
+from django.db import transaction
+from django.db.models import (
+    F,
+    OuterRef,
+    Q,
+    Subquery,
+)
+from django.utils import timezone
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status, viewsets
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.filters import OrderingFilter
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from .filters import ArticleFilter
+from .models import TArticle, TPrix
+from .pagination import ListPagination
+from .serializers import ArticlesSerializers
+
+
 class ArticlesViewSet(viewsets.ModelViewSet):
     queryset = TArticle.objects.all()
     serializer_class = ArticlesSerializers
@@ -170,15 +278,89 @@ class ArticlesViewSet(viewsets.ModelViewSet):
 
     filterset_class = ArticleFilter
 
+    # ======================================
+    # PRIX ACTUEL DE CHAQUE ARTICLE
+    # TArticle et TPrix sont liés par
+    # art_code <-> pri_art_code
+    # ======================================
+    def get_queryset(self):
+        now = timezone.now()
+
+        prix_actuels = (
+            TPrix.objects.filter(pri_art_code=OuterRef("art_code"), pri_enabled=1)
+            .filter(Q(pri_datedeb__isnull=True) | Q(pri_datedeb__lte=now))
+            .filter(Q(pri_datefin__isnull=True) | Q(pri_datefin__gte=now))
+            .order_by(F("pri_datedeb").desc(nulls_last=True), "-pri_id")
+        )
+
+        # On conserve les annotations du prix principal
+        return TArticle.objects.annotate(
+            pri_achat=Subquery(prix_actuels.values("pri_achat")[:1]),
+            pri_vte=Subquery(prix_actuels.values("pri_vte")[:1]),
+            pri_tva=Subquery(prix_actuels.values("pri_tva")[:1]),
+            pri_unitevente=Subquery(prix_actuels.values("pri_unitevente")[:1]),
+        )
+
+    # ======================================
+    # CONVERSION DES VALEURS
+    # ======================================
+    @staticmethod
+    def _to_float(value):
+        return float(value) if value is not None else None
+
+    # ======================================
+    # SERIALISATION AVEC PRIX
+    # ======================================
+    def _serialize_with_prix(self, objects):
+        objects = list(objects)
+
+        data = self.get_serializer(objects, many=True).data
+
+        result = []
+
+        for obj, row in zip(objects, data):
+            # Récupération de TOUS les prix actifs de cet article
+            now = timezone.now()
+
+            prix = (
+                TPrix.objects.filter(pri_art_code=obj.art_code, pri_enabled=1)
+                .filter(Q(pri_datedeb__isnull=True) | Q(pri_datedeb__lte=now))
+                .filter(Q(pri_datefin__isnull=True) | Q(pri_datefin__gte=now))
+                .order_by("pri_unitevente", "-pri_id")
+            )
+
+            row["prix"] = [
+                {
+                    "pri_id": p.pri_id,
+                    "pri_achat": float(p.pri_achat),
+                    "pri_vte": float(p.pri_vte),
+                    "pri_marge": float(p.pri_marge),
+                    "pri_tauxmarge": float(p.pri_tauxmarge),
+                    "pri_tva": float(p.pri_tva),
+                    "pri_unitevente": p.pri_unitevente,
+                    "pri_nbcolis": p.pri_nbcolis,
+                    "pri_datedeb": p.pri_datedeb,
+                    "pri_datefin": p.pri_datefin,
+                }
+                for p in prix
+            ]
+
+            result.append(row)
+
+        return result
+
+    # ======================================
+    # LIST
+    # ======================================
     def list(self, request, *args, **kwargs):
         try:
-            # queryset = self.get_queryset()
             queryset = self.filter_queryset(self.get_queryset())
+
             queryset = queryset.order_by("art_nom")
+
             page = self.paginate_queryset(queryset)
 
             if page is not None:
-                serializer = self.get_serializer(page, many=True)
                 return Response(
                     {
                         "status": True,
@@ -188,15 +370,225 @@ class ArticlesViewSet(viewsets.ModelViewSet):
                         "current_page": self.paginator.page.number,
                         "next": self.paginator.get_next_link(),
                         "previous": self.paginator.get_previous_link(),
-                        "articles": serializer.data,
+                        "articles": self._serialize_with_prix(page),
                     }
                 )
-            serializer = self.get_serializer(queryset, many=True)
+
             return Response(
-                {"status": False, "messages": "ok", "articles": serializer.data}
+                {
+                    "status": True,
+                    "message": "ok",
+                    "articles": self._serialize_with_prix(queryset),
+                }
             )
+
         except Exception as e:
-            return Response({"status": False, "messages": e, "articles": []})
+            return Response(
+                {"status": False, "message": str(e), "articles": []},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    # ======================================
+    # PATCH : MODIFICATION ARTICLE + PRIX
+    # ======================================
+    @transaction.atomic
+    def partial_update(self, request, *args, **kwargs):
+        try:
+            article = self.get_object()
+            data = request.data.copy()
+
+            # Récupération des prix envoyés
+            prix_data = data.pop("prix", [])
+
+            now = timezone.now()
+            # Enregistrer l'utilisateur qui modifie l'article
+            data["art_usermdf"] = request.user.use_login
+            data["art_datemdf"] = now.strftime("%Y-%m-%d %H:%M:%S")
+
+            # 1. MODIFICATION DE L'ARTICLE
+            serializer = self.get_serializer(article, data=data, partial=True)
+
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            # 2. MODIFICATION DES PRIX
+
+            for prix in prix_data:
+                unite = prix.get("pri_unitevente")
+
+                if not unite:
+                    raise ValueError("L'unité de vente est obligatoire.")
+
+                achat = float(prix.get("pri_achat", 0))
+                vente = float(prix.get("pri_vte", 0))
+                tva = float(prix.get("pri_tva", 0))
+                nb_colis = int(prix.get("pri_nbcolis", 1))
+
+                # Calcul de la marge et du taux
+                marge = vente - achat
+
+                taux_marge = (marge / achat) * 100 if achat > 0 else 0
+
+                # Recherche du prix actif de cette unité
+                prix_actuel = (
+                    TPrix.objects.select_for_update()
+                    .filter(
+                        pri_art_code=article.art_code,
+                        pri_enabled=1,
+                        pri_unitevente=unite,
+                    )
+                    .filter(Q(pri_datedeb__isnull=True) | Q(pri_datedeb__lte=now))
+                    .filter(Q(pri_datefin__isnull=True) | Q(pri_datefin__gte=now))
+                    .order_by("-pri_id")
+                    .first()
+                )
+
+                # 3. DESACTIVER L'ANCIEN PRIX
+                if prix_actuel:
+                    prix_actuel.pri_enabled = 0
+                    prix_actuel.pri_datefin = now
+                    prix_actuel.pri_datemdf = now.strftime("%Y-%m-%d %H:%M:%S")
+                    prix_actuel.pri_usermdf = request.user.use_login
+
+                    prix_actuel.save(
+                        update_fields=[
+                            "pri_enabled",
+                            "pri_datefin",
+                            "pri_datemdf",
+                            "pri_usermdf",
+                        ]
+                    )
+
+                # 4. CREER LE NOUVEAU PRIX
+                TPrix.objects.create(
+                    pri_art_code=article.art_code,
+                    pri_datecre=now,
+                    pri_datemdf=None,
+                    pri_usercre=request.user.use_login,
+                    pri_usermdf=None,
+                    pri_enabled=1,
+                    pri_datedeb=now,
+                    pri_datefin=None,
+                    pri_achat=achat,
+                    pri_vte=vente,
+                    pri_marge=marge,
+                    pri_tauxmarge=taux_marge,
+                    pri_tva=tva,
+                    pri_unitevente=unite,
+                    pri_nbcolis=nb_colis,
+                    pri_chgprevu=0,
+                    pri_txremise=0,
+                )
+
+            # 5. RETOURNER L'ARTICLE ACTUALISE
+            article_actualise = self.get_queryset().get(pk=article.pk)
+
+            result = self._serialize_with_prix([article_actualise])
+
+            return Response(
+                {
+                    "status": True,
+                    "message": "Article modifié avec succès.",
+                    "article": result[0],
+                    "prix": result[0]["prix"],
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"status": False, "message": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            article = self.get_object()
+
+            result = self._serialize_with_prix([article])
+
+            return Response(
+                {
+                    "status": True,
+                    "message": "ok",
+                    "article": result[0],
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "article": None,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+@transaction.atomic
+def create(self, request, *args, **kwargs):
+    try:
+        data = request.data.copy()
+        prix_data = data.pop("prix", [])
+
+        # 1. Créer l'article
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        article = serializer.save()
+
+        # 2. Créer les prix de l'article
+        now = timezone.now()
+
+        for prix in prix_data:
+            unite = prix.get("pri_unitevente")
+
+            if not unite:
+                raise ValueError("L'unité de vente est obligatoire.")
+
+            achat = float(prix.get("pri_achat", 0))
+            vente = float(prix.get("pri_vte", 0))
+
+            marge = vente - achat
+
+            taux_marge = (marge / achat) * 100 if achat > 0 else 0
+
+            TPrix.objects.create(
+                pri_art_code=article.art_code,
+                pri_datecre=now,
+                pri_datemdf=None,
+                pri_usercre=request.user.use_login,
+                pri_usermdf=None,
+                pri_enabled=1,
+                pri_datedeb=now,
+                pri_datefin=None,
+                pri_achat=achat,
+                pri_vte=vente,
+                pri_marge=marge,
+                pri_tauxmarge=taux_marge,
+                pri_tva=prix.get("pri_tva", 0),
+                pri_unitevente=unite,
+                pri_nbcolis=int(prix.get("pri_nbcolis", 1)),
+                pri_chgprevu=0,
+                pri_txremise=0,
+            )
+
+        # 3. Récupérer l'article avec tous ses prix actifs
+        article_actualise = self.get_queryset().get(pk=article.pk)
+
+        result = self._serialize_with_prix([article_actualise])
+
+        return Response(
+            {
+                "status": True,
+                "message": "Article créé avec succès.",
+                "article": result[0],
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    except Exception as e:
+        return Response(
+            {"status": False, "message": str(e)}, status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 class CurrentUserViewSet(viewsets.GenericViewSet):
