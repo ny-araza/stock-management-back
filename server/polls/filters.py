@@ -202,20 +202,40 @@ class FournisseurFilter(filters.FilterSet):
 
 
 class ArticleFilter(filters.FilterSet):
-    art_enabled = filters.NumberFilter()
+    # Filtres utilisés par ListeArticles React
+    art_enabled = filters.NumberFilter(field_name="art_enabled")
+
+    art_stockable = filters.NumberFilter(field_name="art_stockable")
+
+    # Recherche globale
+    search = filters.CharFilter(method="filter_search")
+
+    # Filtres par date de création
     art_datecre_year = filters.NumberFilter(
         field_name="art_datecre", lookup_expr="year"
     )
+
     art_datecre_month = filters.NumberFilter(
         field_name="art_datecre", lookup_expr="month"
     )
 
+    # Filtres par date de modification
     art_datemdf_year = filters.NumberFilter(
         field_name="art_datemdf", lookup_expr="year"
     )
+
     art_datemdf_month = filters.NumberFilter(
         field_name="art_datemdf", lookup_expr="month"
     )
+
+    # Recherche globale sur plusieurs colonnes
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(art_code__icontains=value)
+            | Q(art_nom__icontains=value)
+            | Q(art_codebarre__icontains=value)
+            | Q(art_marque__icontains=value)
+        )
 
     class Meta:
         model = TArticle
