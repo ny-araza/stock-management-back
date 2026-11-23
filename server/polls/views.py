@@ -1,6 +1,6 @@
 # from django.shortcuts import render
 from datetime import timedelta
-
+from django.db.models.functions import Coalesce
 from django.conf import settings
 from django.contrib.postgres.forms.hstore import ValidationError
 from django.db import transaction
@@ -14,6 +14,7 @@ from django.db.models import (
     Subquery,
     Sum,
     When,
+    Value
 )
 from django.utils import timezone
 from django.utils.regex_helper import get_quantifier
@@ -2437,33 +2438,56 @@ class StockViewSet(viewsets.GenericViewSet):
             # Garder uniquement la dernière ligne de chaque article
             queryset = queryset.filter(stk_id=Subquery(derniere_ligne))
 
-            # Pagination
+            # ======================================
+            # CALCUL DU TOTAL DES QUANTITES DES LOTS
+            # ======================================
+
+            lots_totaux = (
+                TLot.objects.filter(lot_art_code=OuterRef("stk_art_code"))
+                .values("lot_art_code")
+                .annotate(total=Sum("lot_art_quantite"))
+                .values("total")[:1]
+            )
+
+            # Type du champ quantité pour éviter les conflits de types SQL
+            qte_field = TLot._meta.get_field("lot_art_quantite")
+
+            queryset = queryset.annotate(
+                total_quantite_lots=Coalesce(
+                    Subquery(lots_totaux, output_field=qte_field),
+                    Value(0, output_field=qte_field),
+                    output_field=qte_field,
+                )
+            )
+
+            # ======================================
+            # TRI : PLUS GRANDE QUANTITE EN PREMIER
+            # ======================================
+
+            queryset = queryset.order_by("-total_quantite_lots", "-stk_id")
+
+            # ======================================
+            # PAGINATION
+            # ======================================
+
             page = self.paginate_queryset(queryset)
 
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
-
                 data = serializer.data
 
-                for stock in data:
-                    art_code = stock["stk_art_code"]
+                for stock_data, stock_obj in zip(data, page):
+                    art_code = stock_data["stk_art_code"]
 
                     # Récupérer l'article
                     article = TArticle.objects.filter(art_code=art_code).first()
 
-                    stock["article_table"] = (
+                    stock_data["article_table"] = (
                         ArticlesSerializers(article).data if article else None
                     )
 
-                    # Calculer le total des quantités des lots
-                    total_quantite_lots = (
-                        TLot.objects.filter(lot_art_code=art_code).aggregate(
-                            total=Sum("lot_art_quantite")
-                        )
-                    )["total"] or 0
-
-                    # Ajouter le total dans le JSON
-                    stock["total_quantite_lots"] = total_quantite_lots
+                    # Ajouter le total déjà calculé par la requête
+                    stock_data["total_quantite_lots"] = stock_obj.total_quantite_lots
 
                 return Response(
                     {
@@ -2478,30 +2502,23 @@ class StockViewSet(viewsets.GenericViewSet):
                     }
                 )
 
-            # Sans pagination
-            serializer = self.get_serializer(queryset, many=True)
+            # ======================================
+            # SANS PAGINATION
+            # ======================================
 
+            serializer = self.get_serializer(queryset, many=True)
             data = serializer.data
 
-            for stock in data:
-                art_code = stock["stk_art_code"]
+            for stock_data, stock_obj in zip(data, queryset):
+                art_code = stock_data["stk_art_code"]
 
-                # Récupérer l'article
                 article = TArticle.objects.filter(art_code=art_code).first()
 
-                stock["article_table"] = (
+                stock_data["article_table"] = (
                     ArticlesSerializers(article).data if article else None
                 )
 
-                # Calculer le total des quantités des lots
-                total_quantite_lots = (
-                    TLot.objects.filter(lot_art_code=art_code).aggregate(
-                        total=Sum("lot_art_quantite")
-                    )
-                )["total"] or 0
-
-                # Ajouter le total
-                stock["total_quantite_lots"] = total_quantite_lots
+                stock_data["total_quantite_lots"] = stock_obj.total_quantite_lots
 
             return Response(
                 {
@@ -2517,7 +2534,8 @@ class StockViewSet(viewsets.GenericViewSet):
                     "status": False,
                     "message": str(e),
                     "stock": [],
-                }
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
