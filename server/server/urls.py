@@ -1,9 +1,9 @@
 from django.contrib import admin
 from django.urls import include, path
 from polls import views
+from polls.inventaire.inventaire import InventaireEnregistrerView, InventaireLotsExportView, InventaireLotsView
 from polls.vente.views import ValiderVenteView
 from rest_framework.routers import DefaultRouter
-
 
 router = DefaultRouter()
 
@@ -105,9 +105,23 @@ urlpatterns = [
     path(
         "api/fa-autocomplete/", views.FAAutoComplete.as_view(), name="fa-autocomplete"
     ),
-    
     path("api/vente/valider/", ValiderVenteView.as_view(), name="valider-vente"),
-    path("api/articles-perimes/", views.ExpiredArticlesStock.as_view(), name="articles-perimes"),
+    path(
+        "api/articles-perimes/",
+        views.ExpiredArticlesStock.as_view(),
+        name="articles-perimes",
+    ),
     path("", include("polls.urls_auth")),
-     path("clients/next-code/", views.get_next_cli_code, name="get_next_cli_code"),
+    path("clients/next-code/", views.get_next_cli_code, name="get_next_cli_code"),
+    path("inventaire/lots/", InventaireLotsView.as_view(), name="inventaire-lots"),
+    path(
+        "inventaire/enregistrer/",
+        InventaireEnregistrerView.as_view(),
+        name="inventaire-enregistrer",
+    ),
+    path(
+        "inventaire/lots/export/",
+        InventaireLotsExportView.as_view(),
+        name="inventaire-lots-export",
+    ),
 ]
