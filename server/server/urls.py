@@ -1,7 +1,13 @@
 from django.contrib import admin
 from django.urls import include, path
 from polls import views
-from polls.inventaire.inventaire import InventaireEnregistrerView, InventaireLotsExportView, InventaireLotsView
+from polls.inventaire.inventaire import (
+    InventaireEnregistrerView,
+    InventaireLignesView,
+    InventaireListeView,
+    InventaireLotsExportView,
+    InventaireLotsView,
+)
 from polls.vente.views import ValiderVenteView
 from rest_framework.routers import DefaultRouter
 
@@ -123,5 +129,11 @@ urlpatterns = [
         "inventaire/lots/export/",
         InventaireLotsExportView.as_view(),
         name="inventaire-lots-export",
+    ),
+    path("inventaire/liste/", InventaireListeView.as_view(), name="inventaire-liste"),
+    path(
+        "inventaire/liste/<str:code>/lignes/",
+        InventaireLignesView.as_view(),
+        name="inventaire-lignes",
     ),
 ]
