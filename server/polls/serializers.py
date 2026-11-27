@@ -7,6 +7,7 @@ from .models import (
     TClient,
     TCmdFournis,
     TEntree,
+    TEntreprise,
     TFamille,
     TFournis,
     TInStock,
@@ -27,6 +28,12 @@ from .models import (
     TUsers,
     TVente,
 )
+
+
+class TEntrepriseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TEntreprise
+        fields = "__all__"
 
 
 class PermissionSerializer(serializers.Serializer):

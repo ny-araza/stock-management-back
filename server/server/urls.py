@@ -8,10 +8,11 @@ from polls.inventaire.inventaire import (
     InventaireLotsExportView,
     InventaireLotsView,
 )
+from polls.usermanagement.user import MenusView, ProfileView, UserDetailView, UsersView
 from polls.vente.views import ValiderVenteView
 from rest_framework.routers import DefaultRouter
 
-from polls.usermanagement.user import MenusView, ProfileView, UserDetailView, UsersView
+from polls.entreprise.entreprise import TEntrepriseViewSet
 
 router = DefaultRouter()
 
@@ -24,7 +25,7 @@ router.register(r"bc-list", views.BcViewSet, basename="bc-list")
 router.register(r"fournisseurs", views.FournisseurViewSet, basename="founrisseurs")
 router.register(r"familles", views.FamilleViewSet, basename="familles")
 router.register(r"sous-familles", views.SousFamilleViewSet, basename="sous-familles")
-
+router.register(r"entreprises", TEntrepriseViewSet, basename="entreprises")
 router.register(r"stock", views.StockViewSet, basename="stock")
 
 router.register(r"entree_stock", views.EntreeViewSet, basename="entree_stock")
