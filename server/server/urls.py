@@ -11,6 +11,8 @@ from polls.inventaire.inventaire import (
 from polls.vente.views import ValiderVenteView
 from rest_framework.routers import DefaultRouter
 
+from polls.usermanagement.user import MenusView, ProfileView, UserDetailView, UsersView
+
 router = DefaultRouter()
 
 router.register(r"users", views.TUserViewset)
@@ -136,4 +138,6 @@ urlpatterns = [
         InventaireLignesView.as_view(),
         name="inventaire-lignes",
     ),
+    path("api/access/menus/", MenusView.as_view()),
+    path("api/access/profiles/<str:acc_code>/", ProfileView.as_view()),
 ]
