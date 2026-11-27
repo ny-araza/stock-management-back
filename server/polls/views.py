@@ -1,6 +1,6 @@
 # from django.shortcuts import render
 from datetime import timedelta
-from django.db.models.functions import Coalesce
+
 from django.conf import settings
 from django.contrib.postgres.forms.hstore import ValidationError
 from django.db import transaction
@@ -13,9 +13,10 @@ from django.db.models import (
     Q,
     Subquery,
     Sum,
+    Value,
     When,
-    Value
 )
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.regex_helper import get_quantifier
 from django_filters.rest_framework import DjangoFilterBackend
@@ -154,7 +155,38 @@ class TUserViewset(viewsets.ModelViewSet):
             )
 
         except Exception as e:
-            return Response({"status": False, "messages": e, "users": []})
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                    "users": [],
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            login = instance.use_login
+
+            self.perform_destroy(instance)
+
+            return Response(
+                {
+                    "status": True,
+                    "message": f"Utilisateur {login} supprimé avec succès.",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    "status": False,
+                    "message": str(e),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 # # Articles views
